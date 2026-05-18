@@ -1,14 +1,11 @@
 # Tiny Aya Global Pipeline
 
-Translate text and voice across 67 languages — all running privately on your Mac. Powered by [mlx-community/tiny-aya-global-8bit-mlx](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx) and [Cohere Transcribe](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026).
+Translate text across 67 languages — all running privately on your Mac. Powered by [mlx-community/tiny-aya-global-8bit-mlx](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx).
 
 ## Features
 
 - Side-by-side text translation
 - Swap and download controls
-- Voice translation: record from mic or upload an audio file
-- Auto-transcribed in 14 source languages via [Cohere Transcribe](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026) and auto-translated
-- Silent recordings are skipped and surrounding silence is trimmed via [Silero VAD v6](https://huggingface.co/mlx-community/silero-vad-v6) before transcription
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
 - 8-bit quantized MLX inference on Apple Silicon
 - Local inference — no API key required
@@ -16,7 +13,7 @@ Translate text and voice across 67 languages — all running privately on your M
 ## Prerequisites
 
 - Apple Silicon Mac
-- 16 GB+ RAM recommended (three MLX models load to ~6 GB)
+- 8 GB+ RAM recommended (model loads to ~2 GB)
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
 
@@ -32,7 +29,7 @@ uv sync
 uv run streamlit run streamlit_app.py
 ```
 
-First run downloads three models: tiny-aya-global (~1.7 GB), Cohere Transcribe (~4.1 GB), and Silero VAD v6 (~1.5 MB). Voice recording uses your browser's microphone — you'll be asked to grant permission on first use. To tune the models or sampling parameters, edit the constants at the top of `streamlit_app.py`.
+First run downloads tiny-aya-global (~1.7 GB). To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`.
 
 ## Development
 
@@ -40,15 +37,9 @@ First run downloads three models: tiny-aya-global (~1.7 GB), Cohere Transcribe (
 uv run pytest test_streamlit_app.py test_streamlit_ui.py -v  # run tests
 uv run ruff check --fix .                                    # lint
 uv run ruff format .                                         # format
-uv run ty check streamlit_app.py vad.py                      # type check
+uv run ty check streamlit_app.py                             # type check
 ```
 
 ## License
 
-This app bundles three models:
-
-- tiny-aya-global — [CC-BY-NC](https://cohere.com/c4ai-cc-by-nc-license) (non-commercial only)
-- Cohere Transcribe — [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- Silero VAD v6 — [MIT](https://opensource.org/licenses/MIT)
-
-The combined product is non-commercial because of the tiny-aya-global license.
+This app uses [mlx-community/tiny-aya-global-8bit-mlx](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx) under [CC-BY-NC](https://cohere.com/c4ai-cc-by-nc-license) — non-commercial only.
