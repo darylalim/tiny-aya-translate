@@ -1,6 +1,6 @@
 # Tiny Aya Global Pipeline
 
-Translate text across 67 languages — all running privately on your Mac. Powered by [mlx-community/tiny-aya-global-8bit-mlx](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx).
+Translate text with the [Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
 
 ## Features
 

@@ -1,7 +1,7 @@
 [project]
 name = "tiny-aya-global-pipeline"
 version = "0.3.0"
-description = "Translate text and audio on Apple Silicon with local MLX inference"
+description = "Translate text with the Cohere Labs Tiny Aya Global model on Apple Silicon with MLX."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

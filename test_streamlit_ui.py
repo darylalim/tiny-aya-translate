@@ -40,6 +40,19 @@ def _run_inference_test(input_text: str, generate_result: str) -> AppTest:
     return at
 
 
+# -- Caption -------------------------------------------------------------------
+
+
+def test_caption_mentions_cohere_labs_model(app: AppTest) -> None:
+    caption_texts = [str(c.value) for c in app.caption]
+    assert any("Cohere Labs Tiny Aya Global model" in t for t in caption_texts)
+
+
+def test_caption_links_to_huggingface(app: AppTest) -> None:
+    caption_texts = [str(c.value) for c in app.caption]
+    assert any("huggingface.co/CohereLabs/tiny-aya-global" in t for t in caption_texts)
+
+
 # -- Language defaults ---------------------------------------------------------
 
 
