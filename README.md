@@ -4,16 +4,17 @@ Translate text with the [Cohere Labs Tiny Aya Global model](https://huggingface.
 
 ## Features
 
-- Side-by-side text translation
+- Side-by-side translation with streaming output
 - Swap and download controls
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
+- Up to 8K tokens per input and per output
 - 8-bit quantized MLX inference on Apple Silicon
 - Local inference — no API key required
 
 ## Prerequisites
 
 - Apple Silicon Mac
-- 8 GB+ RAM recommended (model loads to ~2 GB)
+- 8 GB+ RAM recommended (~4 GB during inference)
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
 
@@ -29,7 +30,7 @@ uv sync
 uv run streamlit run streamlit_app.py
 ```
 
-First run downloads tiny-aya-global (~1.7 GB). To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`.
+First run downloads tiny-aya-global (~3.6 GB). To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`.
 
 ## Development
 
