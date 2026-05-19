@@ -6,7 +6,6 @@ from typing import Any
 MODEL_ID: str = "mlx-community/tiny-aya-global-8bit-mlx"
 DEFAULT_TEMPERATURE: float = 0.1
 DEFAULT_MAX_TOKENS: int = 8192
-TOP_P: float = 0.95
 MAX_INPUT_TOKENS: int = 8192
 
 # -- Languages ---------------------------------------------------------------
@@ -132,7 +131,7 @@ def stream_translate(
     from mlx_lm import stream_generate
     from mlx_lm.sample_utils import make_sampler
 
-    sampler = make_sampler(temp=temperature, top_p=TOP_P)
+    sampler = make_sampler(temp=temperature)
     accumulated = ""
     for response in stream_generate(
         model,

@@ -202,7 +202,7 @@ def test_stream_translate_calls_stream_generate_with_correct_params(
         )
     )
 
-    mock_make_sampler.assert_called_once_with(temp=0.3, top_p=streamlit_app.TOP_P)
+    mock_make_sampler.assert_called_once_with(temp=0.3)
     mock_stream_generate.assert_called_once()
     call_kwargs = mock_stream_generate.call_args.kwargs
     assert call_kwargs["prompt"] == [1, 2, 3, 4, 5]
@@ -245,9 +245,7 @@ def test_stream_translate_uses_default_params(
         )
     )
 
-    mock_make_sampler.assert_called_once_with(
-        temp=streamlit_app.DEFAULT_TEMPERATURE, top_p=streamlit_app.TOP_P
-    )
+    mock_make_sampler.assert_called_once_with(temp=streamlit_app.DEFAULT_TEMPERATURE)
     assert (
         mock_stream_generate.call_args.kwargs["max_tokens"]
         == streamlit_app.DEFAULT_MAX_TOKENS

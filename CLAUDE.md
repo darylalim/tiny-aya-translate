@@ -27,7 +27,7 @@ uv run ty check streamlit_app.py                             # type check
 ## Conventions
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` inside their bodies, so tests can patch them without loading the model stack
-- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `TOP_P`, `MAX_INPUT_TOKENS`) at the top of `streamlit_app.py`
+- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`) at the top of `streamlit_app.py`
 - `st.caption` under the title links to the upstream `CohereLabs/tiny-aya-global` page; the app actually loads the MLX-quantized fork via `MODEL_ID`
 - Language selectboxes use the flat `LANGUAGES` list (67 items) with collapsed labels and Streamlit's built-in type-to-search
 - Swap button (`:material/swap_horiz:`, `type="tertiary"`, `help=` tooltip) flips languages via `st.session_state` and moves output into input
@@ -41,7 +41,7 @@ uv run ty check streamlit_app.py                             # type check
 - Controls row is `st.columns(2)`, mirroring the side-by-side input/output panels
 - Translation model loads via `@st.cache_resource def load_model()` using `mlx_lm.load`
 - `tokenize_prompt` applies the chat template with `tokenize=True` and returns the prompt token ids — its `len()` gates against `MAX_INPUT_TOKENS`, and the same ids are passed to `stream_translate` so the prompt is tokenized exactly once per translation
-- `stream_translate` takes pre-tokenized prompt ids, calls `mlx_lm.stream_generate` with `sampler=make_sampler(temp=, top_p=)`, and yields the cleaned running result after each chunk
+- `stream_translate` takes pre-tokenized prompt ids, calls `mlx_lm.stream_generate` with `sampler=make_sampler(temp=)`, and yields the cleaned running result after each chunk
 - `clean_model_output` strips whitespace and the `<|END_RESPONSE|>` token leaked by the model
 - UI tests use `streamlit.testing.v1.AppTest`; mocks target `mlx_lm` because AppTest runs scripts via `exec()`; the download button is accessed via `at.get("download_button")[0]` since it has no named accessor
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)
