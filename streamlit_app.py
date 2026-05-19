@@ -1,11 +1,13 @@
+from collections.abc import Iterator
 from typing import Any
 
 # -- Config ------------------------------------------------------------------
 
 MODEL_ID: str = "mlx-community/tiny-aya-global-8bit-mlx"
 DEFAULT_TEMPERATURE: float = 0.1
-DEFAULT_MAX_TOKENS: int = 700
+DEFAULT_MAX_TOKENS: int = 8192
 TOP_P: float = 0.95
+MAX_INPUT_TOKENS: int = 8192
 
 # -- Languages ---------------------------------------------------------------
 # 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa.
@@ -104,37 +106,43 @@ def build_translation_prompt(
     ]
 
 
+def tokenize_prompt(
+    text: str, source_lang: str, target_lang: str, tokenizer: Any
+) -> list[int]:
+    """Apply the chat template and return the prompt token ids."""
+    messages = build_translation_prompt(text, source_lang, target_lang)
+    return tokenizer.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True
+    )
+
+
 def clean_model_output(decoded_text: str) -> str:
     """Strip the ``<|END_RESPONSE|>`` end-of-turn marker and surrounding whitespace."""
     return decoded_text.replace("<|END_RESPONSE|>", "").strip()
 
 
-def translate_text(
-    text: str,
-    source_lang: str,
-    target_lang: str,
+def stream_translate(
+    prompt_ids: list[int],
     model: Any,
     tokenizer: Any,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-) -> str:
-    """Translate text using the model and return the cleaned result."""
-    from mlx_lm import generate
+) -> Iterator[str]:
+    """Stream cleaned translation chunks from a pre-tokenized prompt."""
+    from mlx_lm import stream_generate
     from mlx_lm.sample_utils import make_sampler
 
-    messages = build_translation_prompt(text, source_lang, target_lang)
-    prompt = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
     sampler = make_sampler(temp=temperature, top_p=TOP_P)
-    result = generate(
+    accumulated = ""
+    for response in stream_generate(
         model,
         tokenizer,
-        prompt=prompt,
+        prompt=prompt_ids,
         max_tokens=max_tokens,
         sampler=sampler,
-    )
-    return clean_model_output(result)
+    ):
+        accumulated += response.text
+        yield clean_model_output(accumulated)
 
 
 import streamlit as st  # noqa: E402
@@ -236,15 +244,16 @@ col_input, col_output = st.columns(2)
 with col_input:
     st.text_area(
         "Input",
-        height=300,
-        max_chars=5000,
+        height=450,
+        max_chars=30000,
         key="translate_input",
         label_visibility="collapsed",
     )
 with col_output:
-    st.text_area(
+    output_placeholder = st.empty()
+    output_placeholder.text_area(
         "Output",
-        height=300,
+        height=450,
         placeholder="Translation",
         disabled=True,
         value=st.session_state.translate_output,
@@ -284,14 +293,35 @@ if st.session_state._do_translate:
         warning_slot.warning("Please enter some text first.")
     elif st.session_state.source_lang == st.session_state.target_lang:
         warning_slot.warning("Please pick two different languages.")
-    else:
-        with st.spinner("Translating..."):
-            result = translate_text(
+    elif (
+        n_tok := len(
+            prompt_ids := tokenize_prompt(
                 current_input,
                 st.session_state.source_lang,
                 st.session_state.target_lang,
-                model,
                 tokenizer,
             )
-        st.session_state.translate_output = result
-        st.rerun()  # Re-render to update the already-rendered output text_area
+        )
+    ) > MAX_INPUT_TOKENS:
+        warning_slot.warning(
+            f"Input is {n_tok} tokens — please keep it under {MAX_INPUT_TOKENS}."
+        )
+    else:
+        partial = ""
+        try:
+            with st.spinner("Translating..."):
+                for partial in stream_translate(prompt_ids, model, tokenizer):
+                    # Non-widget element so the placeholder can be replaced
+                    # mid-script without colliding with the top-of-script
+                    # text_area's auto-generated widget id.
+                    output_placeholder.code(
+                        partial, language=None, wrap_lines=True, height=450
+                    )
+        except Exception as e:
+            warning_slot.error(f"Translation failed: {e}")
+        else:
+            if not partial.strip():
+                warning_slot.warning("Model produced no output.")
+            else:
+                st.session_state.translate_output = partial
+                st.rerun()  # Re-render so the output text_area picks up the final value

@@ -26,11 +26,20 @@ def _rerun_with_mocks(app: AppTest) -> None:
         app.run(timeout=60)
 
 
-def _run_inference_test(input_text: str, generate_result: str) -> AppTest:
+def _make_stream_chunk(text: str) -> MagicMock:
+    chunk = MagicMock()
+    chunk.text = text
+    return chunk
+
+
+def _run_inference_test(input_text: str, chunk_text: str) -> AppTest:
     """Build a fresh AppTest, enter text, click Translate, and return it."""
     with (
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
-        patch("mlx_lm.generate", return_value=generate_result),
+        patch(
+            "mlx_lm.stream_generate",
+            return_value=iter([_make_stream_chunk(chunk_text)]),
+        ),
     ):
         at = AppTest.from_file("streamlit_app.py")
         at.run(timeout=60)
@@ -83,7 +92,10 @@ def test_swap_moves_output_to_input() -> None:
     """After translating, swap should move the output into the input field."""
     with (
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
-        patch("mlx_lm.generate", return_value="Bonjour"),
+        patch(
+            "mlx_lm.stream_generate",
+            return_value=iter([_make_stream_chunk("Bonjour")]),
+        ),
     ):
         at = AppTest.from_file("streamlit_app.py")
         at.run(timeout=60)
@@ -130,7 +142,7 @@ def test_translate_button_enabled_when_model_loaded(app: AppTest) -> None:
 
 
 def test_translate_success_shows_result() -> None:
-    at = _run_inference_test(input_text="Hello", generate_result="Bonjour")
+    at = _run_inference_test(input_text="Hello", chunk_text="Bonjour")
     assert at.text_area[1].value == "Bonjour"
 
 
@@ -173,10 +185,95 @@ def test_change_target_language(app: AppTest) -> None:
 
 
 def test_input_max_chars_enforced(app: AppTest) -> None:
-    app.text_area[0].set_value("x" * 5001)
+    app.text_area[0].set_value("x" * 30001)
     _rerun_with_mocks(app)
 
-    assert len(app.text_area[0].value) <= 5000
+    assert len(app.text_area[0].value) <= 30000
+
+
+def test_translate_too_many_tokens_shows_warning() -> None:
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.apply_chat_template.return_value = list(range(8193))
+
+    with patch("mlx_lm.load", return_value=(MagicMock(), mock_tokenizer)):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.text_area[0].set_value("Hello world")
+        at.button("translate").click()
+        at.run(timeout=60)
+
+    warning_values = [str(w.value) for w in at.warning]
+    assert any("8193" in v and "8192" in v for v in warning_values)
+
+
+def test_translate_at_input_token_limit_succeeds() -> None:
+    """Input at exactly MAX_INPUT_TOKENS should translate without warning."""
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.apply_chat_template.return_value = list(range(8192))
+
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), mock_tokenizer)),
+        patch(
+            "mlx_lm.stream_generate",
+            return_value=iter([_make_stream_chunk("OK")]),
+        ),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.text_area[0].set_value("Hello world")
+        at.button("translate").click()
+        at.run(timeout=60)
+
+    assert at.text_area[1].value == "OK"
+    assert not at.warning
+
+
+def test_translation_error_shows_message() -> None:
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("mlx_lm.stream_generate", side_effect=RuntimeError("OOM")),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.text_area[0].set_value("Hello")
+        at.button("translate").click()
+        at.run(timeout=60)
+
+    error_values = [str(e.value) for e in at.error]
+    assert any("Translation failed" in v and "OOM" in v for v in error_values)
+
+
+def test_empty_stream_shows_warning() -> None:
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("mlx_lm.stream_generate", return_value=iter([])),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.text_area[0].set_value("Hello")
+        at.button("translate").click()
+        at.run(timeout=60)
+
+    warning_values = [str(w.value) for w in at.warning]
+    assert any("no output" in v for v in warning_values)
+
+
+def test_end_response_only_stream_shows_warning() -> None:
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch(
+            "mlx_lm.stream_generate",
+            return_value=iter([_make_stream_chunk("<|END_RESPONSE|>")]),
+        ),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.text_area[0].set_value("Hello")
+        at.button("translate").click()
+        at.run(timeout=60)
+
+    warning_values = [str(w.value) for w in at.warning]
+    assert any("no output" in v for v in warning_values)
 
 
 # -- Download button -----------------------------------------------------------
@@ -195,7 +292,7 @@ def test_download_button_disabled_when_output_empty(app: AppTest) -> None:
 
 
 def test_download_button_enabled_when_output_present() -> None:
-    at = _run_inference_test(input_text="Hello", generate_result="Bonjour")
+    at = _run_inference_test(input_text="Hello", chunk_text="Bonjour")
     assert not at.get("download_button")[0].disabled
 
 
