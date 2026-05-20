@@ -1,12 +1,17 @@
 [project]
 name = "tiny-aya-global-pipeline"
-version = "0.5.0"
-description = "Translate text with the Cohere Labs Tiny Aya Global model on Apple Silicon with MLX."
+version = "0.6.0"
+description = "Translate text and documents with the Cohere Labs Tiny Aya Global model on Apple Silicon with MLX."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "mlx-lm>=0.28.0",
+    "mlx-lm>=0.31.3",
     "streamlit>=1.55.0",
+]
+
+[project.optional-dependencies]
+docs = [
+    "docling>=2.94.0",
 ]
 
 [dependency-groups]
