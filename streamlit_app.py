@@ -12,8 +12,8 @@ DEFAULT_TEMPERATURE: float = 0.1
 DEFAULT_MAX_TOKENS: int = 8192
 MAX_INPUT_TOKENS: int = 8192
 
-# Chunk budget for document translation: leaves headroom under MAX_INPUT_TOKENS
-# for the ~400-token chat-template overhead the prompt adds per chunk.
+# Chunk budget for document translation: well below MAX_INPUT_TOKENS to leave
+# room for the per-chunk prompt wrapper (instruction + chat template).
 MAX_CHUNK_TOKENS: int = 7000
 DOCUMENT_TYPES: list[str] = ["pdf", "docx", "pptx", "xlsx", "html"]
 
