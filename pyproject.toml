@@ -1,6 +1,6 @@
 [project]
 name = "tiny-aya-global-pipeline"
-version = "0.6.0"
+version = "0.6.1"
 description = "Translate text and documents with the Cohere Labs Tiny Aya Global model on Apple Silicon with MLX."
 readme = "README.md"
 requires-python = ">=3.13"
