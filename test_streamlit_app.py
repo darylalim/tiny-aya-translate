@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock, patch
 
 import streamlit_app
@@ -12,6 +13,14 @@ from streamlit_app import (
     tokenize_prompt,
     translate_document,
 )
+
+# -- module configuration ------------------------------------------------------
+
+
+def test_transformers_verbosity_is_set() -> None:
+    # setdefault preserves an existing override, so assert only that it's set.
+    assert os.environ.get("TRANSFORMERS_VERBOSITY")
+
 
 # -- LANGUAGES -----------------------------------------------------------------
 

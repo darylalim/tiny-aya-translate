@@ -30,6 +30,7 @@ uv run ty check streamlit_app.py                             # type check
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
 - Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`, `MAX_CHUNK_TOKENS`, `DOCUMENT_TYPES`) at the top of `streamlit_app.py`
+- `streamlit_app.py` sets `TRANSFORMERS_VERBOSITY=error` via `os.environ.setdefault` at the top of the file, muting transformers' image-processor alias warnings that Streamlit's module watcher otherwise triggers on every rerun
 - `st.caption` under the title links to the upstream `CohereLabs/tiny-aya-global` page; the app actually loads the MLX-quantized fork via `MODEL_ID`
 - Language selectboxes use the flat `LANGUAGES` list (67 items) with collapsed labels and Streamlit's built-in type-to-search
 - Swap button (`:material/swap_horiz:`, `type="tertiary"`, `help=` tooltip) flips languages via `st.session_state` and moves output into input

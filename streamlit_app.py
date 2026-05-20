@@ -1,5 +1,9 @@
+import os
 from collections.abc import Iterator
 from typing import Any
+
+# Mute transformers alias-warning spam triggered by Streamlit's module watcher.
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 # -- Config ------------------------------------------------------------------
 
