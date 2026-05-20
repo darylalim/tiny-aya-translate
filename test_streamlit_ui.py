@@ -280,7 +280,8 @@ def test_end_response_only_stream_shows_warning() -> None:
 
 
 def test_download_button_exists(app: AppTest) -> None:
-    assert len(app.get("download_button")) == 1
+    # One in the Text tab, one in the Document tab.
+    assert len(app.get("download_button")) == 2
 
 
 def test_download_button_label(app: AppTest) -> None:
@@ -321,3 +322,40 @@ def test_model_load_failure_disables_translate_button() -> None:
         at.run(timeout=60)
 
     assert at.button("translate").disabled
+
+
+# -- Document tab --------------------------------------------------------------
+
+
+def test_document_translate_button_exists(app: AppTest) -> None:
+    assert app.button("translate_doc") is not None
+
+
+def test_document_translate_button_disabled_without_upload(app: AppTest) -> None:
+    assert app.button("translate_doc").disabled
+
+
+def test_document_download_button_disabled_when_no_output(app: AppTest) -> None:
+    # The second download button belongs to the Document tab.
+    assert app.get("download_button")[1].disabled
+
+
+def test_document_tab_install_hint_when_docling_missing() -> None:
+    import importlib.util
+
+    real_find_spec = importlib.util.find_spec
+
+    def fake_find_spec(name: str, *args: object, **kwargs: object) -> object:
+        if name == "docling":
+            return None
+        return real_find_spec(name, *args, **kwargs)
+
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("importlib.util.find_spec", side_effect=fake_find_spec),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+
+    info_values = [str(i.value) for i in at.info]
+    assert any("uv sync --extra docs" in v for v in info_values)

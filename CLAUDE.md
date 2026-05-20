@@ -1,12 +1,13 @@
 ## Project
 
-Streamlit app for translating text across 67 languages using `mlx-community/tiny-aya-global-8bit-mlx` with local MLX inference on Apple Silicon.
+Streamlit app for translating text and documents across 67 languages using `mlx-community/tiny-aya-global-8bit-mlx` with local MLX inference on Apple Silicon.
 
 ## Stack
 
 - Python 3.13+ with uv for project management
 - Streamlit for UI
 - mlx-lm for translation inference on Apple Silicon
+- docling (optional `docs` extra) for parsing uploaded documents
 
 ## Structure
 
@@ -17,6 +18,7 @@ Streamlit app for translating text across 67 languages using `mlx-community/tiny
 ## Commands
 
 ```bash
+uv sync --extra docs                                         # install optional document support
 uv run streamlit run streamlit_app.py                        # run the app
 uv run pytest test_streamlit_app.py test_streamlit_ui.py -v  # run tests
 uv run ruff check --fix .                                    # lint
@@ -26,8 +28,8 @@ uv run ty check streamlit_app.py                             # type check
 
 ## Conventions
 
-- Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` inside their bodies, so tests can patch them without loading the model stack
-- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`) at the top of `streamlit_app.py`
+- Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
+- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`, `MAX_CHUNK_TOKENS`, `DOCUMENT_TYPES`) at the top of `streamlit_app.py`
 - `st.caption` under the title links to the upstream `CohereLabs/tiny-aya-global` page; the app actually loads the MLX-quantized fork via `MODEL_ID`
 - Language selectboxes use the flat `LANGUAGES` list (67 items) with collapsed labels and Streamlit's built-in type-to-search
 - Swap button (`:material/swap_horiz:`, `type="tertiary"`, `help=` tooltip) flips languages via `st.session_state` and moves output into input
@@ -43,5 +45,12 @@ uv run ty check streamlit_app.py                             # type check
 - `tokenize_prompt` applies the chat template with `tokenize=True` and returns the prompt token ids — its `len()` gates against `MAX_INPUT_TOKENS`, and the same ids are passed to `stream_translate` so the prompt is tokenized exactly once per translation
 - `stream_translate` takes pre-tokenized prompt ids, calls `mlx_lm.stream_generate` with `sampler=make_sampler(temp=)`, and yields the cleaned running result after each chunk
 - `clean_model_output` strips whitespace and the `<|END_RESPONSE|>` token leaked by the model
-- UI tests use `streamlit.testing.v1.AppTest`; mocks target `mlx_lm` because AppTest runs scripts via `exec()`; the download button is accessed via `at.get("download_button")[0]` since it has no named accessor
+- UI tests use `streamlit.testing.v1.AppTest`; mocks target `mlx_lm` because AppTest runs scripts via `exec()`; download buttons have no named accessor, so `at.get("download_button")` returns both (`[0]` Text tab, `[1]` Document tab)
+- The UI is split into `st.tabs(["Text", "Document"])`: the Text tab is the original side-by-side flow; the Document tab translates uploaded files
+- Document functions (`docling_available`, `load_document`, `chunk_document`, `translate_document`) are pure functions with deferred `docling` imports; `docling` is an optional `docs` extra, and the Document tab shows an install hint when `docling_available()` is `False`
+- `chunk_document` runs Docling's `HybridChunker`; the token budget lives on a `HuggingFaceTokenizer` (the chunker takes no `max_tokens`), and mlx-lm's `TokenizerWrapper` is unwrapped via `._tokenizer` to reach the raw HF tokenizer
+- `translate_document` reuses `tokenize_prompt` + `stream_translate` per chunk and yields `(chunk_index, cumulative_text)` on every token; chunks join with `\n\n`
+- `MAX_CHUNK_TOKENS` (7000) sits below `MAX_INPUT_TOKENS` to leave room for the per-chunk chat-template overhead; `translate_document` still re-checks each chunk and emits a `[Section skipped]` marker for any prompt over `MAX_INPUT_TOKENS`
+- The Document tab uses a plain `if st.button():` block (no `_do_translate` flag, no `st.rerun()`): output streams into an `st.code` placeholder, its `doc_source_lang`/`doc_target_lang` selectboxes use distinct keys to avoid widget-id collisions, and the `download_doc` button is rendered last so it picks up `st.session_state.doc_output`
+- The Document tab re-renders its `st.code` output only on chunk boundaries — re-sending the whole accumulating document every token would be O(n²); a mid-document failure still saves the partial result to `st.session_state.doc_output`
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)

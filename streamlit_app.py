@@ -8,6 +8,11 @@ DEFAULT_TEMPERATURE: float = 0.1
 DEFAULT_MAX_TOKENS: int = 8192
 MAX_INPUT_TOKENS: int = 8192
 
+# Chunk budget for document translation: leaves headroom under MAX_INPUT_TOKENS
+# for the ~400-token chat-template overhead the prompt adds per chunk.
+MAX_CHUNK_TOKENS: int = 7000
+DOCUMENT_TYPES: list[str] = ["pdf", "docx", "pptx", "xlsx", "html"]
+
 # -- Languages ---------------------------------------------------------------
 # 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa.
 
@@ -144,6 +149,67 @@ def stream_translate(
         yield clean_model_output(accumulated)
 
 
+# -- Document functions (optional docling dependency) -------------------------
+
+
+def docling_available() -> bool:
+    """Return True if the optional ``docling`` dependency is importable."""
+    import importlib.util
+
+    return importlib.util.find_spec("docling") is not None
+
+
+def load_document(file_bytes: bytes, filename: str) -> Any:
+    """Parse uploaded file bytes into a ``DoclingDocument``."""
+    import io
+
+    from docling.datamodel.base_models import DocumentStream
+    from docling.document_converter import DocumentConverter
+
+    source = DocumentStream(name=filename, stream=io.BytesIO(file_bytes))
+    return DocumentConverter().convert(source).document
+
+
+def chunk_document(
+    doc: Any, tokenizer: Any, max_tokens: int = MAX_CHUNK_TOKENS
+) -> list[str]:
+    """Split a ``DoclingDocument`` into structure-aware text chunks."""
+    from docling.chunking import HybridChunker
+    from docling_core.transforms.chunker.tokenizer.huggingface import (
+        HuggingFaceTokenizer,
+    )
+
+    # HybridChunker's token budget lives on the tokenizer; mlx-lm wraps the
+    # real Hugging Face tokenizer, so unwrap it via ._tokenizer.
+    dl_tokenizer = HuggingFaceTokenizer(
+        tokenizer=tokenizer._tokenizer, max_tokens=max_tokens
+    )
+    chunker = HybridChunker(tokenizer=dl_tokenizer)
+    return [chunker.contextualize(chunk=c) for c in chunker.chunk(doc)]
+
+
+def translate_document(
+    chunks: list[str],
+    source_lang: str,
+    target_lang: str,
+    model: Any,
+    tokenizer: Any,
+) -> Iterator[tuple[int, str]]:
+    """Translate each chunk; yield ``(index, cumulative_text)`` per token."""
+    done: list[str] = []
+    for i, chunk in enumerate(chunks):
+        prompt_ids = tokenize_prompt(chunk, source_lang, target_lang, tokenizer)
+        if len(prompt_ids) > MAX_INPUT_TOKENS:
+            # Skip rather than abort the whole document on one oversized chunk.
+            done.append("[Section skipped: too long to translate.]")
+            yield i, "\n\n".join(p for p in done if p)
+            continue
+        partial = ""
+        for partial in stream_translate(prompt_ids, model, tokenizer):
+            yield i, "\n\n".join(p for p in [*done, partial] if p)
+        done.append(partial)
+
+
 import streamlit as st  # noqa: E402
 
 
@@ -160,7 +226,7 @@ def load_model() -> tuple[Any, Any]:
 
 st.title("Tiny Aya Global Pipeline")
 st.caption(
-    "Translate text with the "
+    "Translate text and documents with the "
     "[Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global)."
 )
 
@@ -188,6 +254,12 @@ if "translate_output" not in st.session_state:
     st.session_state.translate_output = ""
 if "_do_translate" not in st.session_state:
     st.session_state._do_translate = False
+if "doc_source_lang" not in st.session_state:
+    st.session_state.doc_source_lang = "English"
+if "doc_target_lang" not in st.session_state:
+    st.session_state.doc_target_lang = "French"
+if "doc_output" not in st.session_state:
+    st.session_state.doc_output = ""
 
 
 def request_translate() -> None:
@@ -205,122 +277,249 @@ def swap_languages() -> None:
     st.session_state.translate_output = ""
 
 
-# -- Language bar -------------------------------------------------------------
+text_tab, doc_tab = st.tabs(["Text", "Document"])
 
-col_from, col_swap, col_to = st.columns([10, 1, 10], vertical_alignment="center")
-with col_from:
-    st.selectbox(
-        "From",
-        LANGUAGES,
-        key="source_lang",
-        label_visibility="collapsed",
-    )
-with col_swap:
-    st.button(
-        "",
-        key="swap",
-        icon=":material/swap_horiz:",
-        on_click=swap_languages,
-        use_container_width=True,
-        type="tertiary",
-        help="Swap languages",
-    )
-with col_to:
-    st.selectbox(
-        "To",
-        LANGUAGES,
-        key="target_lang",
-        label_visibility="collapsed",
-    )
+with text_tab:
+    # -- Language bar ---------------------------------------------------------
 
-# -- Warning slot (above panels) ---------------------------------------------
-
-warning_slot = st.container()
-
-# -- Side-by-side text panels ------------------------------------------------
-
-col_input, col_output = st.columns(2)
-with col_input:
-    st.text_area(
-        "Input",
-        height=450,
-        max_chars=30000,
-        key="translate_input",
-        label_visibility="collapsed",
-    )
-with col_output:
-    output_placeholder = st.empty()
-    output_placeholder.text_area(
-        "Output",
-        height=450,
-        placeholder="Translation",
-        disabled=True,
-        value=st.session_state.translate_output,
-        label_visibility="collapsed",
-    )
-
-# -- Controls row -------------------------------------------------------------
-
-sub_translate, sub_download = st.columns(2, vertical_alignment="center", gap="small")
-with sub_translate:
-    st.button(
-        "Translate",
-        key="translate",
-        on_click=request_translate,
-        disabled=not model_loaded,
-        type="primary",
-        use_container_width=True,
-    )
-with sub_download:
-    st.download_button(
-        "Download",
-        key="download",
-        data=st.session_state.translate_output,
-        file_name="translation.txt",
-        mime="text/plain",
-        disabled=not st.session_state.translate_output.strip(),
-        type="secondary",
-        use_container_width=True,
-    )
-
-# -- Process translation request (below controls) ---------------------------
-
-if st.session_state._do_translate:
-    st.session_state._do_translate = False
-    current_input = st.session_state.translate_input
-    if not current_input.strip():
-        warning_slot.warning("Please enter some text first.")
-    elif st.session_state.source_lang == st.session_state.target_lang:
-        warning_slot.warning("Please pick two different languages.")
-    elif (
-        n_tok := len(
-            prompt_ids := tokenize_prompt(
-                current_input,
-                st.session_state.source_lang,
-                st.session_state.target_lang,
-                tokenizer,
-            )
+    col_from, col_swap, col_to = st.columns([10, 1, 10], vertical_alignment="center")
+    with col_from:
+        st.selectbox(
+            "From",
+            LANGUAGES,
+            key="source_lang",
+            label_visibility="collapsed",
         )
-    ) > MAX_INPUT_TOKENS:
-        warning_slot.warning(
-            f"Input is {n_tok} tokens — please keep it under {MAX_INPUT_TOKENS}."
+    with col_swap:
+        st.button(
+            "",
+            key="swap",
+            icon=":material/swap_horiz:",
+            on_click=swap_languages,
+            use_container_width=True,
+            type="tertiary",
+            help="Swap languages",
+        )
+    with col_to:
+        st.selectbox(
+            "To",
+            LANGUAGES,
+            key="target_lang",
+            label_visibility="collapsed",
+        )
+
+    # -- Warning slot (above panels) ------------------------------------------
+
+    warning_slot = st.container()
+
+    # -- Side-by-side text panels ---------------------------------------------
+
+    col_input, col_output = st.columns(2)
+    with col_input:
+        st.text_area(
+            "Input",
+            height=450,
+            max_chars=30000,
+            key="translate_input",
+            label_visibility="collapsed",
+        )
+    with col_output:
+        output_placeholder = st.empty()
+        output_placeholder.text_area(
+            "Output",
+            height=450,
+            placeholder="Translation",
+            disabled=True,
+            value=st.session_state.translate_output,
+            label_visibility="collapsed",
+        )
+
+    # -- Controls row ---------------------------------------------------------
+
+    sub_translate, sub_download = st.columns(
+        2, vertical_alignment="center", gap="small"
+    )
+    with sub_translate:
+        st.button(
+            "Translate",
+            key="translate",
+            on_click=request_translate,
+            disabled=not model_loaded,
+            type="primary",
+            use_container_width=True,
+        )
+    with sub_download:
+        st.download_button(
+            "Download",
+            key="download",
+            data=st.session_state.translate_output,
+            file_name="translation.txt",
+            mime="text/plain",
+            disabled=not st.session_state.translate_output.strip(),
+            type="secondary",
+            use_container_width=True,
+        )
+
+    # -- Process translation request (below controls) -------------------------
+
+    if st.session_state._do_translate:
+        st.session_state._do_translate = False
+        current_input = st.session_state.translate_input
+        if not current_input.strip():
+            warning_slot.warning("Please enter some text first.")
+        elif st.session_state.source_lang == st.session_state.target_lang:
+            warning_slot.warning("Please pick two different languages.")
+        elif (
+            n_tok := len(
+                prompt_ids := tokenize_prompt(
+                    current_input,
+                    st.session_state.source_lang,
+                    st.session_state.target_lang,
+                    tokenizer,
+                )
+            )
+        ) > MAX_INPUT_TOKENS:
+            warning_slot.warning(
+                f"Input is {n_tok} tokens — please keep it under {MAX_INPUT_TOKENS}."
+            )
+        else:
+            partial = ""
+            try:
+                with st.spinner("Translating..."):
+                    for partial in stream_translate(prompt_ids, model, tokenizer):
+                        # Non-widget element so the placeholder can be replaced
+                        # mid-script without colliding with the top-of-script
+                        # text_area's auto-generated widget id.
+                        output_placeholder.code(
+                            partial, language=None, wrap_lines=True, height=450
+                        )
+            except Exception as e:
+                warning_slot.error(f"Translation failed: {e}")
+            else:
+                if not partial.strip():
+                    warning_slot.warning("Model produced no output.")
+                else:
+                    st.session_state.translate_output = partial
+                    # Rerun so the disabled output picks up the final value.
+                    st.rerun()
+
+with doc_tab:
+    if not docling_available():
+        st.info(
+            "Document translation needs the optional `docling` package. "
+            "Install it with `uv sync --extra docs`."
         )
     else:
-        partial = ""
-        try:
-            with st.spinner("Translating..."):
-                for partial in stream_translate(prompt_ids, model, tokenizer):
-                    # Non-widget element so the placeholder can be replaced
-                    # mid-script without colliding with the top-of-script
-                    # text_area's auto-generated widget id.
-                    output_placeholder.code(
-                        partial, language=None, wrap_lines=True, height=450
-                    )
-        except Exception as e:
-            warning_slot.error(f"Translation failed: {e}")
-        else:
-            if not partial.strip():
-                warning_slot.warning("Model produced no output.")
+        # -- Language bar -----------------------------------------------------
+
+        doc_col_from, doc_col_to = st.columns(2)
+        with doc_col_from:
+            st.selectbox(
+                "From",
+                LANGUAGES,
+                key="doc_source_lang",
+                label_visibility="collapsed",
+            )
+        with doc_col_to:
+            st.selectbox(
+                "To",
+                LANGUAGES,
+                key="doc_target_lang",
+                label_visibility="collapsed",
+            )
+
+        # -- Upload + controls ------------------------------------------------
+
+        uploaded = st.file_uploader(
+            "Upload a document",
+            type=DOCUMENT_TYPES,
+            label_visibility="collapsed",
+        )
+        translate_doc_clicked = st.button(
+            "Translate document",
+            key="translate_doc",
+            disabled=not (model_loaded and uploaded is not None),
+            type="primary",
+            use_container_width=True,
+        )
+
+        # -- Warning slot + streamed output -----------------------------------
+
+        doc_warning_slot = st.container()
+        doc_output_placeholder = st.empty()
+        if st.session_state.doc_output:
+            doc_output_placeholder.code(
+                st.session_state.doc_output,
+                language=None,
+                wrap_lines=True,
+                height=450,
+            )
+
+        # -- Process document translation -------------------------------------
+
+        if translate_doc_clicked and uploaded is not None:
+            if st.session_state.doc_source_lang == st.session_state.doc_target_lang:
+                doc_warning_slot.warning("Please pick two different languages.")
             else:
-                st.session_state.translate_output = partial
-                st.rerun()  # Re-render so the output text_area picks up the final value
+                result = ""
+                try:
+                    with st.spinner("Reading document..."):
+                        doc = load_document(uploaded.getvalue(), uploaded.name)
+                        chunks = chunk_document(doc, tokenizer)
+                    if not chunks:
+                        doc_warning_slot.warning(
+                            "No translatable text found in the document."
+                        )
+                    else:
+                        progress = st.progress(0.0)
+                        status = st.empty()
+                        last_rendered = -1
+                        for idx, cumulative in translate_document(
+                            chunks,
+                            st.session_state.doc_source_lang,
+                            st.session_state.doc_target_lang,
+                            model,
+                            tokenizer,
+                        ):
+                            result = cumulative
+                            progress.progress(idx / len(chunks))
+                            status.write(
+                                f"Translating section {idx + 1} of {len(chunks)}"
+                            )
+                            # Re-render only on chunk boundaries; re-sending the
+                            # whole growing document every token is O(n²).
+                            if idx != last_rendered:
+                                doc_output_placeholder.code(
+                                    result, language=None, wrap_lines=True, height=450
+                                )
+                                last_rendered = idx
+                        progress.progress(1.0)
+                        status.empty()
+                        doc_output_placeholder.code(
+                            result, language=None, wrap_lines=True, height=450
+                        )
+                        if result.strip():
+                            st.session_state.doc_output = result
+                        else:
+                            doc_warning_slot.warning("Model produced no output.")
+                except Exception as e:
+                    if result.strip():
+                        st.session_state.doc_output = result
+                        doc_warning_slot.error(
+                            f"Translation failed after partial output: {e}"
+                        )
+                    else:
+                        doc_warning_slot.error(f"Translation failed: {e}")
+
+        # -- Download ---------------------------------------------------------
+
+        st.download_button(
+            "Download",
+            key="download_doc",
+            data=st.session_state.doc_output,
+            file_name="translation.md",
+            mime="text/markdown",
+            disabled=not st.session_state.doc_output.strip(),
+            type="secondary",
+            use_container_width=True,
+        )

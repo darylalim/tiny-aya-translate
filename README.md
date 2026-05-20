@@ -1,10 +1,11 @@
 # Tiny Aya Global Pipeline
 
-Translate text with the [Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
+Translate text and documents with the [Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
 
 ## Features
 
 - Side-by-side translation with streaming output
+- Document translation (PDF, DOCX, PPTX, XLSX, HTML) via Docling — optional
 - Swap and download controls
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
 - Up to 8K tokens per input and per output
@@ -21,7 +22,8 @@ Translate text with the [Cohere Labs Tiny Aya Global model](https://huggingface.
 ## Setup
 
 ```bash
-uv sync
+uv sync                # core: text translation
+uv sync --extra docs   # also install document translation support
 ```
 
 ## Usage
@@ -30,7 +32,7 @@ uv sync
 uv run streamlit run streamlit_app.py
 ```
 
-First run downloads tiny-aya-global (~3.6 GB). To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`.
+First run downloads tiny-aya-global (~3.6 GB); document translation also downloads Docling's layout models on first use. To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`.
 
 ## Development
 

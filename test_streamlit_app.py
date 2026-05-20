@@ -4,9 +4,13 @@ import streamlit_app
 from streamlit_app import (
     LANGUAGES,
     build_translation_prompt,
+    chunk_document,
     clean_model_output,
+    docling_available,
+    load_document,
     stream_translate,
     tokenize_prompt,
+    translate_document,
 )
 
 # -- LANGUAGES -----------------------------------------------------------------
@@ -250,3 +254,209 @@ def test_stream_translate_uses_default_params(
         mock_stream_generate.call_args.kwargs["max_tokens"]
         == streamlit_app.DEFAULT_MAX_TOKENS
     )
+
+
+# -- docling_available ---------------------------------------------------------
+
+
+@patch("importlib.util.find_spec")
+def test_docling_available_true_when_spec_found(mock_find_spec: MagicMock) -> None:
+    mock_find_spec.return_value = object()
+    assert docling_available() is True
+
+
+@patch("importlib.util.find_spec")
+def test_docling_available_false_when_spec_missing(
+    mock_find_spec: MagicMock,
+) -> None:
+    mock_find_spec.return_value = None
+    assert docling_available() is False
+
+
+# -- load_document -------------------------------------------------------------
+
+
+@patch("docling.document_converter.DocumentConverter")
+def test_load_document_returns_converted_document(
+    mock_converter_cls: MagicMock,
+) -> None:
+    expected_doc = MagicMock()
+    mock_converter_cls.return_value.convert.return_value.document = expected_doc
+
+    assert load_document(b"file bytes", "sample.pdf") is expected_doc
+
+
+@patch("docling.document_converter.DocumentConverter")
+def test_load_document_builds_stream_with_filename(
+    mock_converter_cls: MagicMock,
+) -> None:
+    load_document(b"data", "report.docx")
+
+    source = mock_converter_cls.return_value.convert.call_args[0][0]
+    assert source.name == "report.docx"
+
+
+@patch("docling.document_converter.DocumentConverter")
+def test_load_document_passes_file_bytes_to_stream(
+    mock_converter_cls: MagicMock,
+) -> None:
+    load_document(b"hello bytes", "notes.html")
+
+    source = mock_converter_cls.return_value.convert.call_args[0][0]
+    assert source.stream.getvalue() == b"hello bytes"
+
+
+# -- chunk_document ------------------------------------------------------------
+
+
+@patch("docling.chunking.HybridChunker")
+@patch("docling_core.transforms.chunker.tokenizer.huggingface.HuggingFaceTokenizer")
+def test_chunk_document_returns_contextualized_strings(
+    mock_hf_tokenizer: MagicMock, mock_hybrid_chunker_cls: MagicMock
+) -> None:
+    chunker = mock_hybrid_chunker_cls.return_value
+    chunker.chunk.return_value = ["raw_a", "raw_b"]
+    chunker.contextualize.side_effect = ["context A", "context B"]
+
+    result = chunk_document(MagicMock(), MagicMock())
+
+    assert result == ["context A", "context B"]
+
+
+@patch("docling.chunking.HybridChunker")
+@patch("docling_core.transforms.chunker.tokenizer.huggingface.HuggingFaceTokenizer")
+def test_chunk_document_handles_empty_document(
+    mock_hf_tokenizer: MagicMock, mock_hybrid_chunker_cls: MagicMock
+) -> None:
+    mock_hybrid_chunker_cls.return_value.chunk.return_value = []
+
+    assert chunk_document(MagicMock(), MagicMock()) == []
+
+
+@patch("docling.chunking.HybridChunker")
+@patch("docling_core.transforms.chunker.tokenizer.huggingface.HuggingFaceTokenizer")
+def test_chunk_document_passes_max_tokens_to_tokenizer(
+    mock_hf_tokenizer: MagicMock, mock_hybrid_chunker_cls: MagicMock
+) -> None:
+    mock_hybrid_chunker_cls.return_value.chunk.return_value = []
+
+    chunk_document(MagicMock(), MagicMock(), max_tokens=1234)
+
+    assert mock_hf_tokenizer.call_args.kwargs["max_tokens"] == 1234
+
+
+@patch("docling.chunking.HybridChunker")
+@patch("docling_core.transforms.chunker.tokenizer.huggingface.HuggingFaceTokenizer")
+def test_chunk_document_defaults_to_max_chunk_tokens(
+    mock_hf_tokenizer: MagicMock, mock_hybrid_chunker_cls: MagicMock
+) -> None:
+    mock_hybrid_chunker_cls.return_value.chunk.return_value = []
+
+    chunk_document(MagicMock(), MagicMock())
+
+    assert (
+        mock_hf_tokenizer.call_args.kwargs["max_tokens"]
+        == streamlit_app.MAX_CHUNK_TOKENS
+    )
+
+
+# -- translate_document --------------------------------------------------------
+
+
+@patch("mlx_lm.stream_generate")
+def test_translate_document_yields_cumulative_per_chunk(
+    mock_stream_generate: MagicMock,
+) -> None:
+    mock_stream_generate.side_effect = [
+        iter([_make_chunk("Bon"), _make_chunk("jour")]),
+        iter([_make_chunk("Salut")]),
+    ]
+
+    results = list(
+        translate_document(
+            ["chunk one", "chunk two"],
+            "English",
+            "French",
+            MagicMock(),
+            MagicMock(),
+        )
+    )
+
+    assert results == [
+        (0, "Bon"),
+        (0, "Bonjour"),
+        (1, "Bonjour\n\nSalut"),
+    ]
+
+
+@patch("mlx_lm.stream_generate")
+def test_translate_document_handles_empty_chunk_list(
+    mock_stream_generate: MagicMock,
+) -> None:
+    results = list(
+        translate_document([], "English", "French", MagicMock(), MagicMock())
+    )
+
+    assert results == []
+    mock_stream_generate.assert_not_called()
+
+
+@patch("mlx_lm.stream_generate")
+def test_translate_document_tokenizes_each_chunk(
+    mock_stream_generate: MagicMock,
+) -> None:
+    mock_stream_generate.side_effect = [
+        iter([_make_chunk("a")]),
+        iter([_make_chunk("b")]),
+    ]
+    mock_tokenizer = MagicMock()
+
+    list(
+        translate_document(
+            ["one", "two"], "English", "French", MagicMock(), mock_tokenizer
+        )
+    )
+
+    assert mock_tokenizer.apply_chat_template.call_count == 2
+
+
+@patch("mlx_lm.stream_generate")
+def test_translate_document_skips_chunk_over_token_limit(
+    mock_stream_generate: MagicMock,
+) -> None:
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.apply_chat_template.return_value = list(range(9000))
+
+    results = list(
+        translate_document(
+            ["a very long chunk"],
+            "English",
+            "French",
+            MagicMock(),
+            mock_tokenizer,
+        )
+    )
+
+    assert len(results) == 1
+    idx, text = results[0]
+    assert idx == 0
+    assert "skipped" in text.lower()
+    mock_stream_generate.assert_not_called()
+
+
+@patch("mlx_lm.stream_generate")
+def test_translate_document_omits_blank_chunk_output(
+    mock_stream_generate: MagicMock,
+) -> None:
+    mock_stream_generate.side_effect = [
+        iter([]),
+        iter([_make_chunk("Salut")]),
+    ]
+
+    results = list(
+        translate_document(
+            ["one", "two"], "English", "French", MagicMock(), MagicMock()
+        )
+    )
+
+    assert results == [(1, "Salut")]
