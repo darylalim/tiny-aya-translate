@@ -1,4 +1,4 @@
-# Tiny Aya Global Pipeline
+# Tiny Aya Translate
 
 Translate text and documents with the [Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
 

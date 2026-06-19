@@ -1,5 +1,5 @@
 [project]
-name = "tiny-aya-global-pipeline"
+name = "tiny-aya-translate"
 version = "0.6.1"
 description = "Translate text and documents with the Cohere Labs Tiny Aya Global model on Apple Silicon with MLX."
 readme = "README.md"

@@ -228,7 +228,7 @@ def load_model() -> tuple[Any, Any]:
 
 # -- Main page ----------------------------------------------------------------
 
-st.title("Tiny Aya Global Pipeline")
+st.title("Tiny Aya Translate")
 st.caption(
     "Translate text and documents with the "
     "[Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global)."

@@ -2198,7 +2198,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tiny-aya-global-pipeline"
+name = "tiny-aya-translate"
 version = "0.6.1"
 source = { virtual = "." }
 dependencies = [
