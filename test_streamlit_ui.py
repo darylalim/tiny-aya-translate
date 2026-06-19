@@ -188,7 +188,9 @@ def test_input_max_chars_enforced(app: AppTest) -> None:
     app.text_area[0].set_value("x" * 30001)
     _rerun_with_mocks(app)
 
-    assert len(app.text_area[0].value) <= 30000
+    value = app.text_area[0].value
+    assert value is not None
+    assert len(value) <= 30000
 
 
 def test_translate_too_many_tokens_shows_warning() -> None:
@@ -345,10 +347,10 @@ def test_document_tab_install_hint_when_docling_missing() -> None:
 
     real_find_spec = importlib.util.find_spec
 
-    def fake_find_spec(name: str, *args: object, **kwargs: object) -> object:
+    def fake_find_spec(name: str, package: str | None = None):
         if name == "docling":
             return None
-        return real_find_spec(name, *args, **kwargs)
+        return real_find_spec(name, package)
 
     with (
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),

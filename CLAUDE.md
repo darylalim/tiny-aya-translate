@@ -23,7 +23,7 @@ uv run streamlit run streamlit_app.py                        # run the app
 uv run pytest test_streamlit_app.py test_streamlit_ui.py -v  # run tests
 uv run ruff check --fix .                                    # lint
 uv run ruff format .                                         # format
-uv run ty check streamlit_app.py                             # type check
+uv run ty check                                              # type check
 ```
 
 When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and ruff to ensure best practices are followed.

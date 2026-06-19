@@ -27,5 +27,14 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]
 
+# Streamlit's AppTest.get() returns Sequence[Element | Block]; widget attributes
+# like .label/.disabled aren't on the Block arm, and download buttons have no
+# typed accessor to narrow to. Relax that one rule for the test files only.
+[[tool.ty.overrides]]
+include = ["test_*.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["."]

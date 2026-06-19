@@ -40,7 +40,7 @@ First run downloads tiny-aya-global (~3.6 GB); document translation also downloa
 uv run pytest test_streamlit_app.py test_streamlit_ui.py -v  # run tests
 uv run ruff check --fix .                                    # lint
 uv run ruff format .                                         # format
-uv run ty check streamlit_app.py                             # type check
+uv run ty check                                              # type check
 ```
 
 ## License
