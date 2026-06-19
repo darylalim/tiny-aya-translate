@@ -9,6 +9,9 @@ dependencies = [
     "streamlit>=1.58.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/darylalim/tiny-aya-translate"
+
 [project.optional-dependencies]
 docs = [
     "docling>=2.103.0",

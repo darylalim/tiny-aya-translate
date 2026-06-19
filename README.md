@@ -22,6 +22,8 @@ Translate text and documents with the [Cohere Labs Tiny Aya Global model](https:
 ## Setup
 
 ```bash
+git clone https://github.com/darylalim/tiny-aya-translate.git
+cd tiny-aya-translate
 uv sync                # core: text translation
 uv sync --extra docs   # also install document translation support
 ```

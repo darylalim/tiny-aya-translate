@@ -22,6 +22,7 @@ __pycache__/
 # Testing / linting
 .pytest_cache/
 .ruff_cache/
+.ty_cache/
 
 # Streamlit
 .streamlit/

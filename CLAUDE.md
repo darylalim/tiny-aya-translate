@@ -57,3 +57,5 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - The Document tab uses a plain `if st.button():` block (no `_do_translate` flag, no `st.rerun()`): output streams into an `st.code` placeholder, its `doc_source_lang`/`doc_target_lang` selectboxes use distinct keys to avoid widget-id collisions, and the `download_doc` button is rendered last so it picks up `st.session_state.doc_output`
 - The Document tab re-renders its `st.code` output only on chunk boundaries — re-sending the whole accumulating document every token would be O(n²); a mid-document failure still saves the partial result to `st.session_state.doc_output`
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)
+- Ruff lint selection is `["E", "F", "I", "W", "UP", "B", "SIM"]` — pycodestyle, pyflakes, isort, pyupgrade, bugbear, and simplify
+- `ty check` covers the whole project; a `[[tool.ty.overrides]]` block ignores `unresolved-attribute` for `test_*.py`, where `AppTest.get()` returns `Element | Block` and download-button widgets can't be narrowed to a typed accessor
