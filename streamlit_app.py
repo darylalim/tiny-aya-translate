@@ -300,7 +300,7 @@ with text_tab:
             key="swap",
             icon=":material/swap_horiz:",
             on_click=swap_languages,
-            use_container_width=True,
+            width="stretch",
             type="tertiary",
             help="Swap languages",
         )
@@ -350,7 +350,7 @@ with text_tab:
             on_click=request_translate,
             disabled=not model_loaded,
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
     with sub_download:
         st.download_button(
@@ -361,7 +361,7 @@ with text_tab:
             mime="text/plain",
             disabled=not st.session_state.translate_output.strip(),
             type="secondary",
-            use_container_width=True,
+            width="stretch",
         )
 
     # -- Process translation request (below controls) -------------------------
@@ -444,7 +444,7 @@ with doc_tab:
             key="translate_doc",
             disabled=not (model_loaded and uploaded is not None),
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
         # -- Warning slot + streamed output -----------------------------------
@@ -525,5 +525,5 @@ with doc_tab:
             mime="text/markdown",
             disabled=not st.session_state.doc_output.strip(),
             type="secondary",
-            use_container_width=True,
+            width="stretch",
         )
