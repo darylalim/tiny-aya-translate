@@ -26,6 +26,8 @@ uv run ruff format .                                         # format
 uv run ty check streamlit_app.py                             # type check
 ```
 
+When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and ruff to ensure best practices are followed.
+
 ## Conventions
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
