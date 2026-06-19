@@ -58,4 +58,4 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - The Document tab re-renders its `st.code` output only on chunk boundaries — re-sending the whole accumulating document every token would be O(n²); a mid-document failure still saves the partial result to `st.session_state.doc_output`
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)
 - Ruff lint selection is `["E", "F", "I", "W", "UP", "B", "SIM"]` — pycodestyle, pyflakes, isort, pyupgrade, bugbear, and simplify
-- `ty check` covers the whole project; a `[[tool.ty.overrides]]` block ignores `unresolved-attribute` for `test_*.py`, where `AppTest.get()` returns `Element | Block` and download-button widgets can't be narrowed to a typed accessor
+- `ty check` covers the whole project; the four `AppTest.get("download_button")` assertions carry inline `# ty: ignore[unresolved-attribute]` because `.get()` returns `Element | Block` and download-button widgets have no typed accessor to narrow to — scoped to those lines so the rule still catches typos elsewhere in the tests

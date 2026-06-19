@@ -294,16 +294,16 @@ def test_download_button_exists(app: AppTest) -> None:
 
 
 def test_download_button_label(app: AppTest) -> None:
-    assert app.get("download_button")[0].label == "Download"
+    assert app.get("download_button")[0].label == "Download"  # ty: ignore[unresolved-attribute]
 
 
 def test_download_button_disabled_when_output_empty(app: AppTest) -> None:
-    assert app.get("download_button")[0].disabled
+    assert app.get("download_button")[0].disabled  # ty: ignore[unresolved-attribute]
 
 
 def test_download_button_enabled_when_output_present() -> None:
     at = _run_inference_test(input_text="Hello", chunk_text="Bonjour")
-    assert not at.get("download_button")[0].disabled
+    assert not at.get("download_button")[0].disabled  # ty: ignore[unresolved-attribute]
 
 
 # -- Output text area ----------------------------------------------------------
@@ -346,7 +346,7 @@ def test_document_translate_button_disabled_without_upload(app: AppTest) -> None
 
 def test_document_download_button_disabled_when_no_output(app: AppTest) -> None:
     # The second download button belongs to the Document tab.
-    assert app.get("download_button")[1].disabled
+    assert app.get("download_button")[1].disabled  # ty: ignore[unresolved-attribute]
 
 
 def test_document_tab_install_hint_when_docling_missing() -> None:
