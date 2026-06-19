@@ -49,6 +49,13 @@ def _run_inference_test(input_text: str, chunk_text: str) -> AppTest:
     return at
 
 
+# -- Title ---------------------------------------------------------------------
+
+
+def test_title_is_app_name(app: AppTest) -> None:
+    assert str(app.title[0].value) == "Tiny Aya Translate"
+
+
 # -- Caption -------------------------------------------------------------------
 
 
