@@ -2317,7 +2317,7 @@ wheels = [
 
 [[package]]
 name = "tiny-aya-translate"
-version = "0.6.1"
+version = "0.6.2"
 source = { virtual = "." }
 dependencies = [
     { name = "mlx-lm" },
