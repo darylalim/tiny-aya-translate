@@ -24,6 +24,6 @@ __pycache__/
 .ruff_cache/
 .ty_cache/
 
-# Streamlit (track the theme config; keep secrets out of git)
+# Streamlit — track theme config, ignore secrets
 .streamlit/*
 !.streamlit/config.toml

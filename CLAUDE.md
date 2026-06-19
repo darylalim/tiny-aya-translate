@@ -14,6 +14,7 @@ Streamlit app for translating text and documents across 67 languages using `mlx-
 - `streamlit_app.py` — main app: config, pure functions, Streamlit UI
 - `test_streamlit_app.py` — pytest unit tests for pure functions
 - `test_streamlit_ui.py` — pytest UI tests for Streamlit interface
+- `.streamlit/config.toml` — Nord dark theme
 
 ## Commands
 
@@ -40,10 +41,11 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - Side-by-side input/output `st.text_area()`
 - Output `text_area` is rendered into an `st.empty()` placeholder (`output_placeholder`) so streaming can replace it progressively
 - Streaming fills the placeholder with `st.code(..., language=None, wrap_lines=True, height=450)`, not `text_area` — repeating a widget call in the same script run would collide on the auto-generated element id, but `st.code` is non-widget and replaces freely
-- Translate button (`type="primary"`, `use_container_width=True`) uses a callback + flag pattern (`_do_translate`); after streaming, the translate block calls `st.rerun()` so the disabled output `text_area` and download button re-render with the final value
+- Translate button (`type="primary"`, `width="stretch"`) uses a callback + flag pattern (`_do_translate`); after streaming, the translate block calls `st.rerun()` so the disabled output `text_area` and download button re-render with the final value
 - Translate block validates input (`tokenize_prompt` + `MAX_INPUT_TOKENS` check) and wraps streaming in `try/except` (errors → `warning_slot.error`, empty output → `warning_slot.warning`)
-- Download button (`type="secondary"`, `use_container_width=True`) uses `st.download_button` to save translation as `translation.txt`
+- Download button (`type="secondary"`, `width="stretch"`) uses `st.download_button` to save translation as `translation.txt`
 - Controls row is `st.columns(2)`, mirroring the side-by-side input/output panels
+- Full-width buttons use `width="stretch"` — Streamlit 1.58's replacement for the deprecated `use_container_width`; a source-level test in `test_streamlit_app.py` guards against reintroducing the old arg
 - Translation model loads via `@st.cache_resource def load_model()` using `mlx_lm.load`
 - `tokenize_prompt` applies the chat template with `tokenize=True` and returns the prompt token ids — its `len()` gates against `MAX_INPUT_TOKENS`, and the same ids are passed to `stream_translate` so the prompt is tokenized exactly once per translation
 - `stream_translate` takes pre-tokenized prompt ids, calls `mlx_lm.stream_generate` with `sampler=make_sampler(temp=)`, and yields the cleaned running result after each chunk
@@ -57,5 +59,6 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - The Document tab uses a plain `if st.button():` block (no `_do_translate` flag, no `st.rerun()`): output streams into an `st.code` placeholder, its `doc_source_lang`/`doc_target_lang` selectboxes use distinct keys to avoid widget-id collisions, and the `download_doc` button is rendered last so it picks up `st.session_state.doc_output`
 - The Document tab re-renders its `st.code` output only on chunk boundaries — re-sending the whole accumulating document every token would be O(n²); a mid-document failure still saves the partial result to `st.session_state.doc_output`
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)
+- The app ships a dark Nord theme in `.streamlit/config.toml`; `.gitignore` tracks `config.toml` but ignores the rest of `.streamlit/` (e.g. `secrets.toml`)
 - Ruff lint selection is `["E", "F", "I", "W", "UP", "B", "SIM"]` — pycodestyle, pyflakes, isort, pyupgrade, bugbear, and simplify
 - `ty check` covers the whole project; the four `AppTest.get("download_button")` assertions carry inline `# ty: ignore[unresolved-attribute]` because `.get()` returns `Element | Block` and download-button widgets have no typed accessor to narrow to — scoped to those lines so the rule still catches typos elsewhere in the tests
