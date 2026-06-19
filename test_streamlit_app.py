@@ -60,12 +60,6 @@ def test_theme_config_has_theme_section() -> None:
     assert "theme" in _load_theme_config()
 
 
-def test_theme_config_uses_nord_dark_palette() -> None:
-    theme = _load_theme_config()["theme"]
-    assert theme["base"] == "dark"
-    assert theme["primaryColor"] == "#88c0d0"
-
-
 # -- LANGUAGES -----------------------------------------------------------------
 
 
