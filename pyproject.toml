@@ -6,19 +6,19 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "mlx-lm>=0.31.3",
-    "streamlit>=1.55.0",
+    "streamlit>=1.58.0",
 ]
 
 [project.optional-dependencies]
 docs = [
-    "docling>=2.94.0",
+    "docling>=2.103.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
-    "ruff>=0.15.7",
-    "ty>=0.0.25",
+    "pytest>=9.1.0",
+    "ruff>=0.15.18",
+    "ty>=0.0.51",
 ]
 
 [tool.ruff]
