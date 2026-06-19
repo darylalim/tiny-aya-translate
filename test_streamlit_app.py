@@ -1,4 +1,7 @@
 import os
+import tomllib
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import streamlit_app
@@ -20,6 +23,47 @@ from streamlit_app import (
 def test_transformers_verbosity_is_set() -> None:
     # setdefault preserves an existing override, so assert only that it's set.
     assert os.environ.get("TRANSFORMERS_VERBOSITY")
+
+
+# -- streamlit_app.py width API ------------------------------------------------
+
+_APP_SOURCE = (Path(__file__).parent / "streamlit_app.py").read_text(encoding="utf-8")
+
+
+def test_no_deprecated_use_container_width() -> None:
+    # use_container_width is deprecated in Streamlit 1.58; guard against
+    # reintroducing it after the migration to the width API.
+    assert "use_container_width" not in _APP_SOURCE
+
+
+def test_buttons_use_width_stretch() -> None:
+    # The five full-width controls (swap, translate, download, translate_doc,
+    # download_doc) set width="stretch".
+    assert _APP_SOURCE.count('width="stretch"') == 5
+
+
+# -- .streamlit/config.toml theme ----------------------------------------------
+
+_CONFIG_PATH = Path(__file__).parent / ".streamlit" / "config.toml"
+
+
+def _load_theme_config() -> dict[str, Any]:
+    with _CONFIG_PATH.open("rb") as f:
+        return tomllib.load(f)
+
+
+def test_theme_config_exists() -> None:
+    assert _CONFIG_PATH.is_file()
+
+
+def test_theme_config_has_theme_section() -> None:
+    assert "theme" in _load_theme_config()
+
+
+def test_theme_config_uses_nord_dark_palette() -> None:
+    theme = _load_theme_config()["theme"]
+    assert theme["base"] == "dark"
+    assert theme["primaryColor"] == "#88c0d0"
 
 
 # -- LANGUAGES -----------------------------------------------------------------
