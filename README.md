@@ -6,6 +6,7 @@ Translate text and documents with the [Cohere Labs Tiny Aya Global model](https:
 
 - Side-by-side translation with streaming output
 - Document translation (PDF, DOCX, PPTX, XLSX, HTML) via Docling — optional
+- Cached document parsing for fast re-translation
 - Swap and download controls
 - Nord theme with light and dark modes
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
