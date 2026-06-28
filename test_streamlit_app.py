@@ -12,6 +12,7 @@ from streamlit_app import (
     clean_model_output,
     docling_available,
     load_document,
+    render_output,
     stream_translate,
     tokenize_prompt,
     translate_document,
@@ -40,6 +41,23 @@ def test_buttons_use_width_stretch() -> None:
     # The five full-width controls (swap, translate, download, translate_doc,
     # download_doc) set width="stretch".
     assert _APP_SOURCE.count('width="stretch"') == 5
+
+
+# -- streamlit_app.py shared UI constants --------------------------------------
+
+
+def test_panel_height_not_hardcoded() -> None:
+    # The 450px panel height now lives in PANEL_HEIGHT; guard against re-inlining
+    # the magic number at a call site (text_area panels or render_output).
+    assert "height=450" not in _APP_SOURCE
+
+
+def test_warning_strings_defined_once() -> None:
+    # Each shared warning lives in exactly one place — its module-level constant.
+    # The Text- and Document-tab call sites reference SAME_LANGUAGE_WARNING /
+    # NO_OUTPUT_WARNING, so neither raw literal should be duplicated.
+    assert _APP_SOURCE.count('"Please pick two different languages."') == 1
+    assert _APP_SOURCE.count('"Model produced no output."') == 1
 
 
 # -- streamlit_app.py page config ----------------------------------------------
@@ -621,3 +639,22 @@ def test_translate_document_omits_blank_chunk_output(
     )
 
     assert results == [(1, "Salut")]
+
+
+# -- render_output -------------------------------------------------------------
+
+
+def test_render_output_renders_code_with_panel_height() -> None:
+    # render_output is the single sink for streamed output across both tabs; it
+    # must use st.code (non-widget, replaceable mid-script without a widget-id
+    # collision) with wrap_lines and the shared PANEL_HEIGHT, not st.text_area.
+    placeholder = MagicMock()
+
+    render_output(placeholder, "Bonjour")
+
+    placeholder.code.assert_called_once_with(
+        "Bonjour",
+        language=None,
+        wrap_lines=True,
+        height=streamlit_app.PANEL_HEIGHT,
+    )
