@@ -29,6 +29,11 @@ uv run ty check                                              # type check
 
 When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and ruff to ensure best practices are followed.
 
+## Automation
+
+- CI (`.github/workflows/ci.yml`) runs on `macos-latest` (Apple Silicon, so `mlx-lm` installs natively) for pushes to `main` and PRs: `ruff format --check .`, `ruff check .`, `ty check`, then `pytest test_streamlit_app.py test_streamlit_ui.py -q`. Note `--check` — unformatted code fails CI rather than being auto-fixed
+- `.claude/settings.json` hooks: `PostToolUse` runs `ruff check --fix . && ruff format .` after every Edit/Write (edited files may be reformatted underneath you), `Stop` runs `ty check` + `pytest` at session end, and a fail-closed `PreToolUse` hook blocks edits to `uv.lock` and `.streamlit/secrets.toml`
+
 ## Conventions
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
