@@ -25,11 +25,12 @@ greenColor = "#a3be8c"
 violetColor = "#b48ead"
 
 # -- Dark mode: Polar Night ---------------------------------------------------
-# primaryColor is the deep frost #5e81ac (not the brighter #88c0d0): Streamlit
-# renders primary-button labels white, and white on #88c0d0 is only ~2:1 (fails
-# WCAG AA). #5e81ac clears it while staying Nord, and matches light mode.
+# primaryColor is the deep frost #4c6a93 (not the brighter #88c0d0/#5e81ac):
+# Streamlit renders primary-button labels white, and that body-size text must
+# clear WCAG AA (4.5:1) — white on #4c6a93 is 5.5:1, vs ~2:1 for #88c0d0. Light
+# mode shares the value, where it also clears 4.5:1 as link text on the light bg.
 [theme.dark]
-primaryColor = "#5e81ac"
+primaryColor = "#4c6a93"
 backgroundColor = "#2e3440"
 secondaryBackgroundColor = "#3b4252"
 textColor = "#eceff4"
@@ -41,12 +42,12 @@ blueColor = "#81a1c1"
 
 # -- Light mode: Snow Storm ---------------------------------------------------
 [theme.light]
-primaryColor = "#5e81ac"
+primaryColor = "#4c6a93"
 backgroundColor = "#eceff4"
 secondaryBackgroundColor = "#e5e9f0"
 textColor = "#2e3440"
 codeBackgroundColor = "#e5e9f0"
 codeTextColor = "#2e3440"
-linkColor = "#5e81ac"
+linkColor = "#4c6a93"
 borderColor = "#d8dee9"
-blueColor = "#5e81ac"
+blueColor = "#4c6a93"

@@ -90,20 +90,31 @@ def _relative_luminance(hex_color: str) -> float:
 
 
 def _contrast_ratio(hex_a: str, hex_b: str) -> float:
-    lighter = max(_relative_luminance(hex_a), _relative_luminance(hex_b))
-    darker = min(_relative_luminance(hex_a), _relative_luminance(hex_b))
+    lum_a, lum_b = _relative_luminance(hex_a), _relative_luminance(hex_b)
+    lighter, darker = max(lum_a, lum_b), min(lum_a, lum_b)
     return (lighter + 0.05) / (darker + 0.05)
 
 
 def test_primary_button_text_readable_in_both_modes() -> None:
-    # Streamlit renders primary-button labels white, so white-on-primaryColor
-    # must clear WCAG AA for large/semibold text (3:1). Guards against a light
-    # accent like the old dark-mode #88c0d0 (~2:1).
+    # Streamlit renders primary-button labels white at body size, so
+    # white-on-primaryColor must clear WCAG AA for normal text (4.5:1). Guards
+    # against a light accent like the old dark-mode #88c0d0 (~2:1).
     theme = _load_theme_config()["theme"]
     for mode in ("light", "dark"):
         primary = theme[mode]["primaryColor"]
         ratio = _contrast_ratio("#ffffff", primary)
-        assert ratio >= 3.0, f"{mode} primaryColor {primary} contrast {ratio:.2f}"
+        assert ratio >= 4.5, f"{mode} primaryColor {primary} contrast {ratio:.2f}"
+
+
+def test_link_text_readable_in_both_modes() -> None:
+    # linkColor is body-size text on the page background, so it must clear WCAG
+    # AA for normal text (4.5:1) in both modes.
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        link = theme[mode]["linkColor"]
+        bg = theme[mode]["backgroundColor"]
+        ratio = _contrast_ratio(link, bg)
+        assert ratio >= 4.5, f"{mode} linkColor {link} on {bg} contrast {ratio:.2f}"
 
 
 # -- LANGUAGES -----------------------------------------------------------------
@@ -499,6 +510,15 @@ def test_cached_document_chunks_forwards_custom_max_tokens(
     cached(b"x", "a.pdf", max_tokens=1234)
 
     assert mock_chunk_document.call_args[0][2] == 1234
+
+
+def test_document_tab_calls_cache_wrapper() -> None:
+    # AppTest can't drive st.file_uploader, so guard the wiring at the source
+    # level: the Document tab must go through cached_document_chunks, not call
+    # load_document/chunk_document directly (which would silently bypass the
+    # parse+chunk cache). Strip whitespace so line-wrapping can't break the match.
+    compact = "".join(_APP_SOURCE.split())
+    assert "cached_document_chunks(uploaded.getvalue(),uploaded.name)" in compact
 
 
 # -- translate_document --------------------------------------------------------
