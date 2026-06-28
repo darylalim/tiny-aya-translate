@@ -47,6 +47,8 @@ uv run ruff format .                                         # format
 uv run ty check                                              # type check
 ```
 
+CI runs these checks on every push and pull request via GitHub Actions on a `macos-latest` runner (Apple Silicon, so `mlx-lm` installs natively); it uses `ruff format --check` rather than formatting in place.
+
 ## License
 
 This app loads [`mlx-community/tiny-aya-global-8bit-mlx`](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx) — an 8-bit MLX-quantized fork of [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) — under [CC-BY-NC](https://cohere.com/c4ai-cc-by-nc-license) (non-commercial only).

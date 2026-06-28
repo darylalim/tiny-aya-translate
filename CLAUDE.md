@@ -37,14 +37,14 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 ## Conventions
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
-- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`, `MAX_CHUNK_TOKENS`, `DOCUMENT_TYPES`) at the top of `streamlit_app.py`
+- Config is hardcoded as module-level constants (`MODEL_ID`, `DEFAULT_TEMPERATURE`, `DEFAULT_MAX_TOKENS`, `MAX_INPUT_TOKENS`, `MAX_CHUNK_TOKENS`, `DOCUMENT_TYPES`) at the top of `streamlit_app.py`, plus shared UI constants (`PANEL_HEIGHT`, `SAME_LANGUAGE_WARNING`, `NO_OUTPUT_WARNING`) reused across both tabs; source-level tests guard against re-inlining `height=450` or duplicating either warning literal
 - `streamlit_app.py` sets `TRANSFORMERS_VERBOSITY=error` via `os.environ.setdefault` at the top of the file, muting transformers' image-processor alias warnings that Streamlit's module watcher otherwise triggers on every rerun
 - Language selectboxes use the flat `LANGUAGES` list (67 items) with collapsed labels and Streamlit's built-in type-to-search; each tab's language bar is wrapped in `st.container(border=True)` as a card (Text tab: from/swap/to; Document tab: from/to)
 - Swap button (`:material/swap_horiz:`, `type="tertiary"`, `help=` tooltip) flips languages via `st.session_state` and moves output into input
 - `warning_slot = st.container()` is declared above the panels so the translation block (which runs later in the script) can place warnings above the input/output without needing `st.rerun()`
 - Side-by-side input/output `st.text_area()`
 - Output `text_area` is rendered into an `st.empty()` placeholder (`output_placeholder`) so streaming can replace it progressively
-- Streaming fills the placeholder with `st.code(..., language=None, wrap_lines=True, height=450)`, not `text_area` — repeating a widget call in the same script run would collide on the auto-generated element id, but `st.code` is non-widget and replaces freely
+- Streaming fills the placeholder via the `render_output(placeholder, text)` helper — `st.code(..., language=None, wrap_lines=True, height=PANEL_HEIGHT)`, not `text_area` — repeating a widget call in the same script run would collide on the auto-generated element id, but `st.code` is non-widget and replaces freely; both tabs render output through this one helper
 - Translate button (`type="primary"`, `width="stretch"`) uses a callback + flag pattern (`_do_translate`); after streaming, the translate block calls `st.rerun()` so the disabled output `text_area` and download button re-render with the final value
 - Translate block validates input (`tokenize_prompt` + `MAX_INPUT_TOKENS` check) and wraps streaming in `try/except` (errors → `warning_slot.error`, empty output → `warning_slot.warning`)
 - Download button (`type="secondary"`, `width="stretch"`) uses `st.download_button` to save translation as `translation.txt`
