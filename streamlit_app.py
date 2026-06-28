@@ -17,6 +17,11 @@ MAX_INPUT_TOKENS: int = 8192
 MAX_CHUNK_TOKENS: int = 7000
 DOCUMENT_TYPES: list[str] = ["pdf", "docx", "pptx", "xlsx", "html"]
 
+# Shared UI constants reused across the Text and Document tabs.
+PANEL_HEIGHT: int = 450
+SAME_LANGUAGE_WARNING: str = "Please pick two different languages."
+NO_OUTPUT_WARNING: str = "Model produced no output."
+
 # -- Languages ---------------------------------------------------------------
 # 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa.
 
@@ -248,6 +253,16 @@ def cached_document_chunks(
     return chunk_document(doc, tokenizer, max_tokens)
 
 
+def render_output(placeholder: Any, text: str) -> None:
+    """Render streamed translation output into ``placeholder``.
+
+    Uses ``st.code`` rather than ``st.text_area`` so the placeholder can be
+    replaced mid-script without colliding with a widget's auto-generated
+    element id.
+    """
+    placeholder.code(text, language=None, wrap_lines=True, height=PANEL_HEIGHT)
+
+
 # -- Main page ----------------------------------------------------------------
 
 st.title("Tiny Aya Translate")
@@ -337,7 +352,7 @@ with text_tab:
     with col_input:
         st.text_area(
             "Input",
-            height=450,
+            height=PANEL_HEIGHT,
             max_chars=30000,
             key="translate_input",
             label_visibility="collapsed",
@@ -346,7 +361,7 @@ with text_tab:
         output_placeholder = st.empty()
         output_placeholder.text_area(
             "Output",
-            height=450,
+            height=PANEL_HEIGHT,
             placeholder="Translation",
             disabled=True,
             value=st.session_state.translate_output,
@@ -387,7 +402,7 @@ with text_tab:
         if not current_input.strip():
             warning_slot.warning("Please enter some text first.")
         elif st.session_state.source_lang == st.session_state.target_lang:
-            warning_slot.warning("Please pick two different languages.")
+            warning_slot.warning(SAME_LANGUAGE_WARNING)
         elif (
             n_tok := len(
                 prompt_ids := tokenize_prompt(
@@ -406,17 +421,12 @@ with text_tab:
             try:
                 with st.spinner("Translating..."):
                     for partial in stream_translate(prompt_ids, model, tokenizer):
-                        # Non-widget element so the placeholder can be replaced
-                        # mid-script without colliding with the top-of-script
-                        # text_area's auto-generated widget id.
-                        output_placeholder.code(
-                            partial, language=None, wrap_lines=True, height=450
-                        )
+                        render_output(output_placeholder, partial)
             except Exception as e:
                 warning_slot.error(f"Translation failed: {e}")
             else:
                 if not partial.strip():
-                    warning_slot.warning("Model produced no output.")
+                    warning_slot.warning(NO_OUTPUT_WARNING)
                 else:
                     st.session_state.translate_output = partial
                     # Rerun so the disabled output picks up the final value.
@@ -469,18 +479,13 @@ with doc_tab:
         doc_warning_slot = st.container()
         doc_output_placeholder = st.empty()
         if st.session_state.doc_output:
-            doc_output_placeholder.code(
-                st.session_state.doc_output,
-                language=None,
-                wrap_lines=True,
-                height=450,
-            )
+            render_output(doc_output_placeholder, st.session_state.doc_output)
 
         # -- Process document translation -------------------------------------
 
         if translate_doc_clicked and uploaded is not None:
             if st.session_state.doc_source_lang == st.session_state.doc_target_lang:
-                doc_warning_slot.warning("Please pick two different languages.")
+                doc_warning_slot.warning(SAME_LANGUAGE_WARNING)
             else:
                 result = ""
                 try:
@@ -511,19 +516,15 @@ with doc_tab:
                             # Re-render only on chunk boundaries; re-sending the
                             # whole growing document every token is O(n²).
                             if idx != last_rendered:
-                                doc_output_placeholder.code(
-                                    result, language=None, wrap_lines=True, height=450
-                                )
+                                render_output(doc_output_placeholder, result)
                                 last_rendered = idx
                         progress.progress(1.0)
                         status.empty()
-                        doc_output_placeholder.code(
-                            result, language=None, wrap_lines=True, height=450
-                        )
+                        render_output(doc_output_placeholder, result)
                         if result.strip():
                             st.session_state.doc_output = result
                         else:
-                            doc_warning_slot.warning("Model produced no output.")
+                            doc_warning_slot.warning(NO_OUTPUT_WARNING)
                 except Exception as e:
                     if result.strip():
                         st.session_state.doc_output = result
