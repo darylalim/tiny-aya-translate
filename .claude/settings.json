@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */uv.lock|uv.lock|*/.streamlit/secrets.toml|.streamlit/secrets.toml) echo \"Blocked: $f is protected — uv.lock changes only via uv; secrets.toml must never be edited here.\" >&2; exit 2;; esac; exit 0",
+            "command": "command -v jq >/dev/null 2>&1 || { echo \"protected-paths hook: jq not found — refusing edit (fail-closed).\" >&2; exit 2; }; f=$(jq -r '.tool_input.file_path // empty'); [ -z \"$f\" ] && { echo \"protected-paths hook: no file_path in tool input — refusing (fail-closed).\" >&2; exit 2; }; fl=$(printf '%s' \"$f\" | tr 'A-Z' 'a-z'); case \"$fl\" in */uv.lock|uv.lock|*/.streamlit/secrets.toml|.streamlit/secrets.toml) echo \"Blocked: $f is protected — uv.lock changes only via uv; secrets must never be edited here.\" >&2; exit 2;; esac; exit 0",
+            "timeout": 10,
             "statusMessage": "checking protected paths"
           }
         ]
