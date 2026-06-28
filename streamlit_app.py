@@ -232,6 +232,22 @@ def load_model() -> tuple[Any, Any]:
     return loaded[0], loaded[1]
 
 
+@st.cache_data(max_entries=8, show_spinner=False)
+def cached_document_chunks(
+    file_bytes: bytes, filename: str, max_tokens: int = MAX_CHUNK_TOKENS
+) -> list[str]:
+    """Parse + chunk an uploaded document, cached by file bytes and filename.
+
+    Re-translating the same upload (e.g. into another language) then skips the
+    expensive Docling convert + chunk. The tokenizer is fetched from the cached
+    ``load_model()`` rather than taken as an argument, since it is unhashable and
+    would defeat ``@st.cache_data``'s argument hashing.
+    """
+    _, tokenizer = load_model()
+    doc = load_document(file_bytes, filename)
+    return chunk_document(doc, tokenizer, max_tokens)
+
+
 # -- Main page ----------------------------------------------------------------
 
 st.title("Tiny Aya Translate")
@@ -282,31 +298,34 @@ text_tab, doc_tab = st.tabs(
 with text_tab:
     # -- Language bar ---------------------------------------------------------
 
-    col_from, col_swap, col_to = st.columns([10, 1, 10], vertical_alignment="center")
-    with col_from:
-        st.selectbox(
-            "From",
-            LANGUAGES,
-            key="source_lang",
-            label_visibility="collapsed",
+    with st.container(border=True):
+        col_from, col_swap, col_to = st.columns(
+            [10, 1, 10], vertical_alignment="center"
         )
-    with col_swap:
-        st.button(
-            "",
-            key="swap",
-            icon=":material/swap_horiz:",
-            on_click=swap_languages,
-            width="stretch",
-            type="tertiary",
-            help="Swap languages",
-        )
-    with col_to:
-        st.selectbox(
-            "To",
-            LANGUAGES,
-            key="target_lang",
-            label_visibility="collapsed",
-        )
+        with col_from:
+            st.selectbox(
+                "From",
+                LANGUAGES,
+                key="source_lang",
+                label_visibility="collapsed",
+            )
+        with col_swap:
+            st.button(
+                "",
+                key="swap",
+                icon=":material/swap_horiz:",
+                on_click=swap_languages,
+                width="stretch",
+                type="tertiary",
+                help="Swap languages",
+            )
+        with col_to:
+            st.selectbox(
+                "To",
+                LANGUAGES,
+                key="target_lang",
+                label_visibility="collapsed",
+            )
 
     # -- Warning slot (above panels) ------------------------------------------
 
@@ -413,21 +432,22 @@ with doc_tab:
     else:
         # -- Language bar -----------------------------------------------------
 
-        doc_col_from, doc_col_to = st.columns(2)
-        with doc_col_from:
-            st.selectbox(
-                "From",
-                LANGUAGES,
-                key="doc_source_lang",
-                label_visibility="collapsed",
-            )
-        with doc_col_to:
-            st.selectbox(
-                "To",
-                LANGUAGES,
-                key="doc_target_lang",
-                label_visibility="collapsed",
-            )
+        with st.container(border=True):
+            doc_col_from, doc_col_to = st.columns(2)
+            with doc_col_from:
+                st.selectbox(
+                    "From",
+                    LANGUAGES,
+                    key="doc_source_lang",
+                    label_visibility="collapsed",
+                )
+            with doc_col_to:
+                st.selectbox(
+                    "To",
+                    LANGUAGES,
+                    key="doc_target_lang",
+                    label_visibility="collapsed",
+                )
 
         # -- Upload + controls ------------------------------------------------
 
@@ -465,8 +485,9 @@ with doc_tab:
                 result = ""
                 try:
                     with st.spinner("Reading document..."):
-                        doc = load_document(uploaded.getvalue(), uploaded.name)
-                        chunks = chunk_document(doc, tokenizer)
+                        chunks = cached_document_chunks(
+                            uploaded.getvalue(), uploaded.name
+                        )
                     if not chunks:
                         doc_warning_slot.warning(
                             "No translatable text found in the document."
