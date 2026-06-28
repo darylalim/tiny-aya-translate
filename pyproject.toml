@@ -1,6 +1,6 @@
 [project]
 name = "tiny-aya-translate"
-version = "0.8.0"
+version = "0.8.1"
 description = "Streamlit application for translation using Cohere Labs Tiny Aya Global on Apple Silicon with MLX."
 readme = "README.md"
 requires-python = ">=3.13"
