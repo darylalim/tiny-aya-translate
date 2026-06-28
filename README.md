@@ -1,6 +1,6 @@
 # Tiny Aya Translate
 
-Translate text and documents with the [Cohere Labs Tiny Aya Global model](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
+Streamlit application for translation using [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) on Apple Silicon with MLX.
 
 ## Features
 

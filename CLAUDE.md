@@ -1,6 +1,6 @@
 ## Project
 
-Streamlit app for translating text and documents across 67 languages using `mlx-community/tiny-aya-global-8bit-mlx` with local MLX inference on Apple Silicon.
+Streamlit application for translation using Cohere Labs Tiny Aya Global on Apple Silicon with MLX. The app translates text and documents across 67 languages with local inference via the `mlx-community/tiny-aya-global-8bit-mlx` model.
 
 ## Stack
 
