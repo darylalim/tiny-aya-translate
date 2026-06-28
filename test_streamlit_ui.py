@@ -56,6 +56,16 @@ def test_title_is_app_name(app: AppTest) -> None:
     assert str(app.title[0].value) == "Tiny Aya Translate"
 
 
+# -- Tabs ----------------------------------------------------------------------
+
+
+def test_tabs_labelled_text_and_document_with_icons(app: AppTest) -> None:
+    assert [t.label for t in app.tabs] == [
+        ":material/text_fields: Text",
+        ":material/description: Document",
+    ]
+
+
 # -- Language defaults ---------------------------------------------------------
 
 

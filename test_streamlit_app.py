@@ -42,6 +42,18 @@ def test_buttons_use_width_stretch() -> None:
     assert _APP_SOURCE.count('width="stretch"') == 5
 
 
+# -- streamlit_app.py page config ----------------------------------------------
+
+
+def test_set_page_config_sets_title_icon_and_wide_layout() -> None:
+    # set_page_config must be the first Streamlit command; it defines the
+    # browser-tab title, favicon, and the wide layout for the side-by-side panels.
+    assert "st.set_page_config(" in _APP_SOURCE
+    assert 'page_title="Tiny Aya Translate"' in _APP_SOURCE
+    assert 'page_icon=":material/translate:"' in _APP_SOURCE
+    assert 'layout="wide"' in _APP_SOURCE
+
+
 # -- .streamlit/config.toml theme ----------------------------------------------
 
 _CONFIG_PATH = Path(__file__).parent / ".streamlit" / "config.toml"
@@ -66,6 +78,32 @@ def test_theme_config_defines_light_and_dark_modes() -> None:
     theme = _load_theme_config()["theme"]
     assert "light" in theme
     assert "dark" in theme
+
+
+def _relative_luminance(hex_color: str) -> float:
+    r, g, b = (int(hex_color[i : i + 2], 16) / 255 for i in (1, 3, 5))
+
+    def _lin(c: float) -> float:
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def _contrast_ratio(hex_a: str, hex_b: str) -> float:
+    lighter = max(_relative_luminance(hex_a), _relative_luminance(hex_b))
+    darker = min(_relative_luminance(hex_a), _relative_luminance(hex_b))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def test_primary_button_text_readable_in_both_modes() -> None:
+    # Streamlit renders primary-button labels white, so white-on-primaryColor
+    # must clear WCAG AA for large/semibold text (3:1). Guards against a light
+    # accent like the old dark-mode #88c0d0 (~2:1).
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        primary = theme[mode]["primaryColor"]
+        ratio = _contrast_ratio("#ffffff", primary)
+        assert ratio >= 3.0, f"{mode} primaryColor {primary} contrast {ratio:.2f}"
 
 
 # -- LANGUAGES -----------------------------------------------------------------
@@ -413,6 +451,54 @@ def test_chunk_document_defaults_to_max_chunk_tokens(
         mock_hf_tokenizer.call_args.kwargs["max_tokens"]
         == streamlit_app.MAX_CHUNK_TOKENS
     )
+
+
+# -- cached_document_chunks ----------------------------------------------------
+
+
+@patch("streamlit_app.chunk_document")
+@patch("streamlit_app.load_document")
+@patch("streamlit_app.load_model")
+def test_cached_document_chunks_composes_load_and_chunk(
+    mock_load_model: MagicMock,
+    mock_load_document: MagicMock,
+    mock_chunk_document: MagicMock,
+) -> None:
+    cached = streamlit_app.cached_document_chunks
+    cached.clear()
+    tokenizer = MagicMock()
+    mock_load_model.return_value = (MagicMock(), tokenizer)
+    doc = MagicMock()
+    mock_load_document.return_value = doc
+    mock_chunk_document.return_value = ["chunk a", "chunk b"]
+
+    result = cached(b"bytes", "report.pdf")
+
+    # Pulls the tokenizer from load_model() rather than taking it as an arg, then
+    # composes load_document -> chunk_document.
+    assert result == ["chunk a", "chunk b"]
+    mock_load_document.assert_called_once_with(b"bytes", "report.pdf")
+    mock_chunk_document.assert_called_once_with(
+        doc, tokenizer, streamlit_app.MAX_CHUNK_TOKENS
+    )
+
+
+@patch("streamlit_app.chunk_document")
+@patch("streamlit_app.load_document")
+@patch("streamlit_app.load_model")
+def test_cached_document_chunks_forwards_custom_max_tokens(
+    mock_load_model: MagicMock,
+    _mock_load_document: MagicMock,
+    mock_chunk_document: MagicMock,
+) -> None:
+    cached = streamlit_app.cached_document_chunks
+    cached.clear()
+    mock_load_model.return_value = (MagicMock(), MagicMock())
+    mock_chunk_document.return_value = []
+
+    cached(b"x", "a.pdf", max_tokens=1234)
+
+    assert mock_chunk_document.call_args[0][2] == 1234
 
 
 # -- translate_document --------------------------------------------------------
