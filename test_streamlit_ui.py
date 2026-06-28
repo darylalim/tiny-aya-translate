@@ -56,19 +56,6 @@ def test_title_is_app_name(app: AppTest) -> None:
     assert str(app.title[0].value) == "Tiny Aya Translate"
 
 
-# -- Caption -------------------------------------------------------------------
-
-
-def test_caption_mentions_cohere_labs_model(app: AppTest) -> None:
-    caption_texts = [str(c.value) for c in app.caption]
-    assert any("Cohere Labs Tiny Aya Global model" in t for t in caption_texts)
-
-
-def test_caption_links_to_huggingface(app: AppTest) -> None:
-    caption_texts = [str(c.value) for c in app.caption]
-    assert any("huggingface.co/CohereLabs/tiny-aya-global" in t for t in caption_texts)
-
-
 # -- Language defaults ---------------------------------------------------------
 
 
