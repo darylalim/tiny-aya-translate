@@ -216,6 +216,12 @@ def translate_document(
 
 import streamlit as st  # noqa: E402
 
+st.set_page_config(
+    page_title="Tiny Aya Translate",
+    page_icon=":material/translate:",
+    layout="wide",
+)
+
 
 @st.cache_resource
 def load_model() -> tuple[Any, Any]:
@@ -244,22 +250,14 @@ except Exception as e:
 
 # -- Session state defaults ---------------------------------------------------
 
-if "source_lang" not in st.session_state:
-    st.session_state.source_lang = "English"
-if "target_lang" not in st.session_state:
-    st.session_state.target_lang = "French"
-if "translate_input" not in st.session_state:
-    st.session_state.translate_input = ""
-if "translate_output" not in st.session_state:
-    st.session_state.translate_output = ""
-if "_do_translate" not in st.session_state:
-    st.session_state._do_translate = False
-if "doc_source_lang" not in st.session_state:
-    st.session_state.doc_source_lang = "English"
-if "doc_target_lang" not in st.session_state:
-    st.session_state.doc_target_lang = "French"
-if "doc_output" not in st.session_state:
-    st.session_state.doc_output = ""
+st.session_state.setdefault("source_lang", "English")
+st.session_state.setdefault("target_lang", "French")
+st.session_state.setdefault("translate_input", "")
+st.session_state.setdefault("translate_output", "")
+st.session_state.setdefault("_do_translate", False)
+st.session_state.setdefault("doc_source_lang", "English")
+st.session_state.setdefault("doc_target_lang", "French")
+st.session_state.setdefault("doc_output", "")
 
 
 def request_translate() -> None:
@@ -277,7 +275,9 @@ def swap_languages() -> None:
     st.session_state.translate_output = ""
 
 
-text_tab, doc_tab = st.tabs(["Text", "Document"])
+text_tab, doc_tab = st.tabs(
+    [":material/text_fields: Text", ":material/description: Document"]
+)
 
 with text_tab:
     # -- Language bar ---------------------------------------------------------
@@ -407,7 +407,8 @@ with doc_tab:
     if not docling_available():
         st.info(
             "Document translation needs the optional `docling` package. "
-            "Install it with `uv sync --extra docs`."
+            "Install it with `uv sync --extra docs`.",
+            icon=":material/download:",
         )
     else:
         # -- Language bar -----------------------------------------------------

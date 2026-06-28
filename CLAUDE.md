@@ -50,7 +50,9 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - `stream_translate` takes pre-tokenized prompt ids, calls `mlx_lm.stream_generate` with `sampler=make_sampler(temp=)`, and yields the cleaned running result after each chunk
 - `clean_model_output` strips whitespace and the `<|END_RESPONSE|>` token leaked by the model
 - UI tests use `streamlit.testing.v1.AppTest`; mocks target `mlx_lm` because AppTest runs scripts via `exec()`; download buttons have no named accessor, so `at.get("download_button")` returns both (`[0]` Text tab, `[1]` Document tab)
-- The UI is split into `st.tabs(["Text", "Document"])`: the Text tab is the original side-by-side flow; the Document tab translates uploaded files
+- `st.set_page_config` is the first Streamlit command (right after `import streamlit as st`, before the `@st.cache_resource` decorator runs): sets `page_title`, `page_icon=":material/translate:"`, and `layout="wide"` so the side-by-side text panels get horizontal room
+- Session-state defaults are seeded with `st.session_state.setdefault(key, default)` (one line each), not `if key not in st.session_state`
+- The UI is split into `st.tabs([":material/text_fields: Text", ":material/description: Document"])`: the Text tab is the original side-by-side flow; the Document tab translates uploaded files
 - Document functions (`docling_available`, `load_document`, `chunk_document`, `translate_document`) are pure functions with deferred `docling` imports; `docling` is an optional `docs` extra, and the Document tab shows an install hint when `docling_available()` is `False`
 - `chunk_document` runs Docling's `HybridChunker`; the token budget lives on a `HuggingFaceTokenizer` (the chunker takes no `max_tokens`), and mlx-lm's `TokenizerWrapper` is unwrapped via `._tokenizer` to reach the raw HF tokenizer
 - `translate_document` reuses `tokenize_prompt` + `stream_translate` per chunk and yields `(chunk_index, cumulative_text)` on every token; chunks join with `\n\n`
