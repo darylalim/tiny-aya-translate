@@ -14,7 +14,7 @@ Streamlit app for translating text and documents across 67 languages using `mlx-
 - `streamlit_app.py` — main app: config, pure functions, Streamlit UI
 - `test_streamlit_app.py` — pytest unit tests for pure functions
 - `test_streamlit_ui.py` — pytest UI tests for Streamlit interface
-- `.streamlit/config.toml` — Nord dark theme
+- `.streamlit/config.toml` — Nord theme, light and dark modes
 
 ## Commands
 
@@ -59,6 +59,6 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - The Document tab uses a plain `if st.button():` block (no `_do_translate` flag, no `st.rerun()`): output streams into an `st.code` placeholder, its `doc_source_lang`/`doc_target_lang` selectboxes use distinct keys to avoid widget-id collisions, and the `download_doc` button is rendered last so it picks up `st.session_state.doc_output`
 - The Document tab re-renders its `st.code` output only on chunk boundaries — re-sending the whole accumulating document every token would be O(n²); a mid-document failure still saves the partial result to `st.session_state.doc_output`
 - The app uses one model: `mlx-community/tiny-aya-global-8bit-mlx` (CC-BY-NC, non-commercial only)
-- The app ships a dark Nord theme in `.streamlit/config.toml`; `.gitignore` tracks `config.toml` but ignores the rest of `.streamlit/` (e.g. `secrets.toml`)
+- The app ships a Nord theme in `.streamlit/config.toml` with both `[theme.light]` (Snow Storm) and `[theme.dark]` (Polar Night) variants — defining both is what surfaces the light/dark switch in Streamlit's settings menu; shared typography/shape/Aurora-status colors live in the bare `[theme]` section. `.gitignore` tracks `config.toml` but ignores the rest of `.streamlit/` (e.g. `secrets.toml`)
 - Ruff lint selection is `["E", "F", "I", "W", "UP", "B", "SIM"]` — pycodestyle, pyflakes, isort, pyupgrade, bugbear, and simplify
 - `ty check` covers the whole project; the four `AppTest.get("download_button")` assertions carry inline `# ty: ignore[unresolved-attribute]` because `.get()` returns `Element | Block` and download-button widgets have no typed accessor to narrow to — scoped to those lines so the rule still catches typos elsewhere in the tests

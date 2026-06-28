@@ -7,7 +7,7 @@ Translate text and documents with the [Cohere Labs Tiny Aya Global model](https:
 - Side-by-side translation with streaming output
 - Document translation (PDF, DOCX, PPTX, XLSX, HTML) via Docling — optional
 - Swap and download controls
-- Dark Nord theme
+- Nord theme with light and dark modes
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
 - Up to 8K tokens per input and per output
 - 8-bit quantized MLX inference on Apple Silicon
@@ -35,7 +35,7 @@ uv sync --extra docs   # also install document translation support
 uv run streamlit run streamlit_app.py
 ```
 
-First run downloads tiny-aya-global (~3.6 GB); document translation also downloads Docling's layout models on first use. To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`. The app ships with a dark Nord theme; edit `.streamlit/config.toml` to restyle it.
+First run downloads tiny-aya-global (~3.6 GB); document translation also downloads Docling's layout models on first use. To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`. The app ships with a Nord theme in light and dark modes (switch via the app's settings menu); edit `.streamlit/config.toml` to restyle it.
 
 ## Development
 

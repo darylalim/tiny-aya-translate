@@ -60,6 +60,14 @@ def test_theme_config_has_theme_section() -> None:
     assert "theme" in _load_theme_config()
 
 
+def test_theme_config_defines_light_and_dark_modes() -> None:
+    # Both variants must exist for Streamlit to show the light/dark switch;
+    # a lone [theme] section would lock the app to a single mode.
+    theme = _load_theme_config()["theme"]
+    assert "light" in theme
+    assert "dark" in theme
+
+
 # -- LANGUAGES -----------------------------------------------------------------
 
 
