@@ -11,8 +11,9 @@ __pycache__/
 # OS
 .DS_Store
 
-# IDE / tooling
-.claude/
+# IDE / tooling — track Claude Code hooks/permissions, ignore the rest
+.claude/*
+!.claude/settings.json
 .superpowers/
 .worktrees/
 .idea/

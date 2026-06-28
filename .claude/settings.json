@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */uv.lock|uv.lock|*/.streamlit/secrets.toml|.streamlit/secrets.toml) echo \"Blocked: $f is protected — uv.lock changes only via uv; secrets.toml must never be edited here.\" >&2; exit 2;; esac; exit 0",
+            "statusMessage": "checking protected paths"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run ruff check --fix . && uv run ruff format .",
+            "timeout": 60,
+            "statusMessage": "ruff: lint-fix + format"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run ty check && uv run pytest test_streamlit_app.py test_streamlit_ui.py -q",
+            "timeout": 180,
+            "statusMessage": "ty check + pytest"
+          }
+        ]
+      }
+    ]
+  }
+}
