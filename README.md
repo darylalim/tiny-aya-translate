@@ -47,7 +47,7 @@ uv run ruff format .                                         # format
 uv run ty check                                              # type check
 ```
 
-CI runs these checks on every push and pull request via GitHub Actions on a `macos-latest` runner (Apple Silicon, so `mlx-lm` installs natively); it uses `ruff format --check` rather than formatting in place.
+CI runs these checks on every pull request and on pushes to `main` via GitHub Actions on a `macos-latest` runner (Apple Silicon, so `mlx-lm` installs natively); it uses `ruff format --check` rather than formatting in place.
 
 ## License
 
