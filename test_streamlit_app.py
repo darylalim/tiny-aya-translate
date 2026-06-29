@@ -658,3 +658,10 @@ def test_render_output_renders_code_with_panel_height() -> None:
         wrap_lines=True,
         height=streamlit_app.PANEL_HEIGHT,
     )
+
+
+def test_render_output_is_single_code_sink() -> None:
+    # render_output is the single st.code sink; guard against re-inlining
+    # `.code(...)` at a call site, which passes the helper unit test and the
+    # height-literal guard yet defeats the dedup the refactor exists for.
+    assert _APP_SOURCE.count(".code(") == 1
