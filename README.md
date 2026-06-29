@@ -1,10 +1,17 @@
 # Tiny Aya Translate
 
+[![CI](https://github.com/darylalim/tiny-aya-translate/actions/workflows/ci.yml/badge.svg)](https://github.com/darylalim/tiny-aya-translate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/darylalim/tiny-aya-translate)](https://github.com/darylalim/tiny-aya-translate/releases)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20code%20%C2%B7%20CC--BY--NC%20model-blue)](#license)
+![Python](https://img.shields.io/badge/python-3.13%2B-blue)
+
 *Private, on-device translation for Apple Silicon — 67 languages, text and documents, no API key.*
 
 Translate text and whole documents across **67 languages** entirely on your Mac. Tiny Aya Translate runs [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) locally with [MLX](https://github.com/ml-explore/mlx) — nothing is sent to a server, and no API key is required.
 
 > **Note:** the model weights are licensed **CC-BY-NC (non-commercial only)** — see [License](#license).
+
+![Tiny Aya Translate — side-by-side text translation in dark Nord mode](assets/screenshot.png)
 
 ## Features
 
