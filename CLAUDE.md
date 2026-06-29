@@ -34,6 +34,14 @@ When working with Python, invoke the relevant `/astral:<skill>` for uv, ty, and 
 - CI (`.github/workflows/ci.yml`) runs on `macos-latest` (Apple Silicon, so `mlx-lm` installs natively) for pushes to `main` and PRs: `ruff format --check .`, `ruff check .`, `ty check`, then `pytest test_streamlit_app.py test_streamlit_ui.py -q`. Note `--check` — unformatted code fails CI rather than being auto-fixed
 - `.claude/settings.json` hooks: `PostToolUse` runs `ruff check --fix . && ruff format .` after every Edit/Write (edited files may be reformatted underneath you), `Stop` runs `ty check` + `pytest` at session end, and a fail-closed `PreToolUse` hook blocks edits to `uv.lock` and `.streamlit/secrets.toml`
 
+## Releases
+
+- Versioned with SemVer in `pyproject.toml` (`version`); currently pre-1.0 (0.x). First tagged release was `v0.8.2`
+- Release flow: bump `pyproject.toml` `version` → matching annotated tag (`git tag -a vX.Y.Z`) → publish a GitHub Release from that tag. Keep pyproject version, tag, and release in lockstep. Tags carry a `v` prefix; `pyproject` stays bare
+- A version bump touches **two** files — `uv.lock` records the project's own version too, so commit `pyproject.toml` + `uv.lock` together (any `uv` command run after the bump re-syncs the lock)
+- Tags must be pushed explicitly (`git push origin vX.Y.Z`); a branch push (including via GitHub Desktop) does not carry them — verify with `git ls-remote --tags origin`
+- Release notes are written by hand: commits land directly on `main` (not via PRs), so GitHub's auto-generated notes have little to aggregate
+
 ## Conventions
 
 - Pure functions are defined above `import streamlit` with deferred imports for `mlx_lm` and `docling` inside their bodies, so tests can patch them without loading the model stack
