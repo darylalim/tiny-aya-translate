@@ -3,6 +3,8 @@ name = "tiny-aya-translate"
 version = "0.8.1"
 description = "Streamlit application for translation using Cohere Labs Tiny Aya Global on Apple Silicon with MLX."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "mlx-lm>=0.31.3",

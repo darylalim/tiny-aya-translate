@@ -51,4 +51,6 @@ CI runs these checks on every pull request and on pushes to `main` via GitHub Ac
 
 ## License
 
-This app loads [`mlx-community/tiny-aya-global-8bit-mlx`](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx) — an 8-bit MLX-quantized fork of [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) — under [CC-BY-NC](https://cohere.com/c4ai-cc-by-nc-license) (non-commercial only).
+The application code in this repository is licensed under the [Apache License 2.0](LICENSE).
+
+It loads [`mlx-community/tiny-aya-global-8bit-mlx`](https://huggingface.co/mlx-community/tiny-aya-global-8bit-mlx) — an 8-bit MLX-quantized fork of [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) — under [CC-BY-NC](https://cohere.com/c4ai-cc-by-nc-license). The model weights are **non-commercial only**, so running this app commercially would violate the model license regardless of the code license above.
