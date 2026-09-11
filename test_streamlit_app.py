@@ -473,15 +473,16 @@ def test_load_document_markdown_keeps_pdfs_offline(
 
 
 @patch("liteparse.LiteParse")
-def test_load_document_markdown_survives_ocr_failure(
+def test_load_document_markdown_lets_an_ocr_failure_raise(
     mock_liteparse_cls: MagicMock,
 ) -> None:
-    # An OCR attempt that cannot fetch its data must not kill a parse whose
-    # text layer was readable all along.
+    # Only images run OCR, and an image has no text layer to fall back to, so
+    # a non-fatal failure could only surface as "No translatable text found".
+    # Leaving LiteParse's default (fatal) lets the tab report the real error.
     mock_liteparse_cls.return_value.parse.return_value.text = "Body."
     load_document_markdown(b"data")
 
-    assert mock_liteparse_cls.call_args.kwargs["ocr_failure_fatal"] is False
+    assert "ocr_failure_fatal" not in mock_liteparse_cls.call_args.kwargs
 
 
 @patch("liteparse.LiteParse")

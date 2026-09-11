@@ -297,7 +297,9 @@ def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> s
 
     ``source_lang`` selects the OCR language for image uploads; it is ignored
     for PDFs, which never run OCR. Returns ``""`` when the file yielded no
-    readable text.
+    readable text, and lets LiteParse's ``ParseError`` propagate when an
+    image's OCR cannot run at all (its training data is neither cached nor
+    fetchable).
     """
     from liteparse import LiteParse
 
@@ -308,15 +310,17 @@ def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> s
     # OCR on sparse pages, which downloads ~15 MB of Tesseract training data
     # from GitHub on first use. This app's whole premise is that nothing leaves
     # the machine, so PDFs -- the common case -- stay strictly offline.
-    # ocr_failure_fatal=False so an OCR attempt that cannot fetch its data
-    # never kills a parse whose text layer was readable all along.
+    # ocr_failure_fatal is left at LiteParse's default (True). Only images run
+    # OCR here, and an image has no text layer to fall back to, so False could
+    # only turn "could not fetch eng.traineddata" into an empty fence that the
+    # tab reports as "No translatable text found"; raising lets the tab show
+    # the real error instead.
     # quiet=True keeps LiteParse's timing lines out of the server's stderr.
     parser = LiteParse(
         output_format="markdown",
         quiet=True,
         ocr_enabled=not file_bytes.lstrip()[:4].startswith(b"%PDF"),
         ocr_language=OCR_LANGUAGES.get(source_lang, "eng"),
-        ocr_failure_fatal=False,
     )
     text = parser.parse(file_bytes).text
     return "" if is_blank_markdown(text) else text

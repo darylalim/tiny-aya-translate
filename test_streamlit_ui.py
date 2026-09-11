@@ -566,6 +566,44 @@ def test_download_buttons_do_not_trigger_a_rerun(app: AppTest) -> None:
         assert button.ignore_rerun  # ty: ignore[unresolved-attribute]
 
 
+def test_document_ocr_failure_shows_the_error_not_the_blank_guard() -> None:
+    # Only images run OCR, and an image has no text layer to fall back to.
+    # With ocr_failure_fatal=False an uncached, unfetchable traineddata came
+    # back as the empty fence, and the tab said "No translatable text found"
+    # about a scan it had never read. Left fatal, the real error reaches the
+    # same except that reports a model failure.
+    from liteparse import ParseError
+
+    def fake_liteparse(**kwargs: Any) -> MagicMock:
+        # Mirror LiteParse: non-fatal "continues with partial (native-text)
+        # results", of which an image has none, so the parse returns the
+        # empty fence; fatal raises.
+        parser = MagicMock()
+        if kwargs.get("ocr_failure_fatal") is False:
+            parser.parse.return_value.text = "```text\n\n```"
+        else:
+            parser.parse.side_effect = ParseError(
+                "OCR failed: error sending request for url (.../eng.traineddata)"
+            )
+        return parser
+
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("liteparse.LiteParse", side_effect=fake_liteparse),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.get("file_uploader")[0].upload("scan.png", b"\x89PNG fake")  # ty: ignore[unresolved-attribute]
+        at.run(timeout=60)
+        at.button("translate_doc").click()
+        at.run(timeout=60)
+
+    assert any("Translation failed: OCR failed" in str(e.value) for e in at.error)
+    assert not any("No translatable text" in str(w.value) for w in at.warning)
+    assert at.session_state["doc_output"] == ""
+    assert at.get("download_button")[1].disabled  # ty: ignore[unresolved-attribute]
+
+
 # -- Stale state after a failed or empty translation ---------------------------
 
 
