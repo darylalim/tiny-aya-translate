@@ -285,11 +285,25 @@ _MAX_CHAR_TOKENS = 4
 def is_blank_markdown(text: str) -> bool:
     """True when a parse produced no readable content.
 
-    A file LiteParse could not read comes back as an empty ```` ```text``` ````
-    fence. That is not blank, so it would sail past the Document tab's "no
-    translatable text" guard and be handed to the model as a prompt.
+    A readable file with nothing to read -- a blank image after OCR, or a PDF
+    with no text layer, which the offline policy never OCRs -- comes back as
+    an empty ```` ```text``` ```` fence. That is not blank, so it would sail
+    past the Document tab's "no translatable text" guard and be handed to the
+    model as a prompt. An image LiteParse cannot OCR at all raises instead;
+    see ``load_document_markdown``.
     """
     return not _FENCE_RE.sub("", text).strip()
+
+
+def is_pdf(file_bytes: bytes) -> bool:
+    """True when ``file_bytes`` opens with the ``%PDF`` magic.
+
+    The one format decision made in-app rather than left to LiteParse. It
+    picks the offline parse path in ``load_document_markdown`` and names the
+    no-text-layer case at the Document tab's blank guard, so both sides of
+    that policy ask the same question.
+    """
+    return file_bytes.lstrip()[:4].startswith(b"%PDF")
 
 
 def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> str:
@@ -319,7 +333,7 @@ def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> s
     parser = LiteParse(
         output_format="markdown",
         quiet=True,
-        ocr_enabled=not file_bytes.lstrip()[:4].startswith(b"%PDF"),
+        ocr_enabled=not is_pdf(file_bytes),
         ocr_language=OCR_LANGUAGES.get(source_lang, "eng"),
     )
     text = parser.parse(file_bytes).text
@@ -1387,94 +1401,118 @@ with doc_tab:
         # A failed load has already reported itself into that slot.
         elif (loaded := ensure_model(doc_status_slot)) is not None:
             model, tokenizer = loaded
-            result = ""
+            # Reading the document is its own failure, not a translation
+            # failure: LiteParse raises before the model sees a token. It used
+            # to share the translation loop's except, which reported an
+            # unreadable image as "Translation failed: OCR failed ..." about a
+            # translation that was never attempted.
             try:
                 with doc_status_slot.spinner("Reading document..."):
                     chunks = cached_document_chunks(
                         uploaded.getvalue(), st.session_state.doc_source_lang
                     )
+            except Exception as e:
+                doc_warning_slot.error(f"Could not read the document: {e}")
+                _restore_doc_meta()
+            else:
                 if not chunks:
-                    doc_warning_slot.warning(
-                        "No translatable text found in the document."
-                    )
-                    _restore_doc_meta()
-                else:
-                    last_rendered = -1
-                    # A short PDF is one chunk, which is the common case, so
-                    # the plural cannot be hardcoded into the status label.
-                    n_sections = len(chunks)
-                    sections = "section" if n_sections == 1 else "sections"
-                    # st.status rather than a progress bar plus a caption: it
-                    # reports "running" with a spinner instead of a fraction,
-                    # and the fraction was the wrong shape here. Chunks
-                    # complete, so the only honest value is idx/len(chunks) --
-                    # which sits at 0% for the whole of the first chunk, and
-                    # therefore for the entire run of a single-chunk document.
-                    # Its context manager also settles the state itself:
-                    # "complete" on a clean exit, "error" when an exception
-                    # propagates. The pair it replaces did neither on the
-                    # failure path, stranding a half-filled bar and a
-                    # "Translating section k of n" caption under the error.
-                    # type="compact" because the body is empty: render_output
-                    # writes into doc_output_placeholder, an st.empty() created
-                    # above this block, so nothing nests inside the status. The
-                    # default type would be a bordered expander over nothing.
-                    with doc_status_slot.status(
-                        f"Translating {n_sections} {sections}", type="compact"
-                    ) as doc_status:
-                        for idx, cumulative in translate_document(
-                            chunks,
-                            st.session_state.doc_source_lang,
-                            st.session_state.doc_target_lang,
-                            model,
-                            tokenizer,
-                        ):
-                            result = cumulative
-                            # Everything in here is chunk-scoped, but
-                            # translate_document yields once per *token*. Both
-                            # the label and the rendered output change only
-                            # when idx does, so re-emitting them per token
-                            # bought two identical deltas a token: measured at
-                            # 1.15 s of server work per 15k tokens against
-                            # 1.5 ms guarded. Re-sending the whole growing
-                            # document every token is O(n²) besides.
-                            if idx != last_rendered:
-                                doc_status.update(
-                                    label=f"Translating section {idx + 1} "
-                                    f"of {n_sections}"
-                                )
-                                render_output(doc_output_placeholder, result)
-                                last_rendered = idx
-                        render_output(doc_output_placeholder, result)
-                        doc_status.update(label=f"Translated {n_sections} {sections}")
-                    if result.strip():
-                        st.session_state.doc_output = result
-                        record_document_provenance(
-                            doc_meta_slot,
-                            uploaded.name,
-                            st.session_state.doc_source_lang,
-                            st.session_state.doc_target_lang,
+                    if is_pdf(uploaded.getvalue()):
+                        # The offline policy never OCRs a PDF (see
+                        # load_document_markdown), so a scanned PDF arrives
+                        # here with nothing to chunk. It is not blank -- it
+                        # has no text layer -- and calling it blank sent
+                        # people looking for a fault in the file.
+                        doc_warning_slot.warning(
+                            "This PDF has no text layer. OCR runs only on "
+                            "image uploads, so export the scanned pages as "
+                            "PNG or JPEG and upload those."
                         )
                     else:
-                        doc_warning_slot.warning(NO_OUTPUT_WARNING)
-                        _restore_doc_meta()
-            except Exception as e:
-                if result.strip():
-                    st.session_state.doc_output = result
-                    # A partial result is still downloadable, so it still needs
-                    # to say which file and pair it came from.
-                    record_document_provenance(
-                        doc_meta_slot,
-                        uploaded.name,
-                        st.session_state.doc_source_lang,
-                        st.session_state.doc_target_lang,
-                    )
-                    doc_warning_slot.error(
-                        f"Translation failed after partial output: {e}"
-                    )
-                else:
-                    doc_warning_slot.error(f"Translation failed: {e}")
+                        doc_warning_slot.warning(
+                            "No translatable text found in the document."
+                        )
                     _restore_doc_meta()
+                else:
+                    result = ""
+                    try:
+                        last_rendered = -1
+                        # A short PDF is one chunk, which is the common case, so
+                        # the plural cannot be hardcoded into the status label.
+                        n_sections = len(chunks)
+                        sections = "section" if n_sections == 1 else "sections"
+                        # st.status rather than a progress bar plus a caption: it
+                        # reports "running" with a spinner instead of a fraction,
+                        # and the fraction was the wrong shape here. Chunks
+                        # complete, so the only honest value is idx/len(chunks) --
+                        # which sits at 0% for the whole of the first chunk, and
+                        # therefore for the entire run of a single-chunk document.
+                        # Its context manager also settles the state itself:
+                        # "complete" on a clean exit, "error" when an exception
+                        # propagates. The pair it replaces did neither on the
+                        # failure path, stranding a half-filled bar and a
+                        # "Translating section k of n" caption under the error.
+                        # type="compact" because the body is empty: render_output
+                        # writes into doc_output_placeholder, an st.empty() created
+                        # above this block, so nothing nests inside the status. The
+                        # default type would be a bordered expander over nothing.
+                        with doc_status_slot.status(
+                            f"Translating {n_sections} {sections}", type="compact"
+                        ) as doc_status:
+                            for idx, cumulative in translate_document(
+                                chunks,
+                                st.session_state.doc_source_lang,
+                                st.session_state.doc_target_lang,
+                                model,
+                                tokenizer,
+                            ):
+                                result = cumulative
+                                # Everything in here is chunk-scoped, but
+                                # translate_document yields once per *token*. Both
+                                # the label and the rendered output change only
+                                # when idx does, so re-emitting them per token
+                                # bought two identical deltas a token: measured at
+                                # 1.15 s of server work per 15k tokens against
+                                # 1.5 ms guarded. Re-sending the whole growing
+                                # document every token is O(n²) besides.
+                                if idx != last_rendered:
+                                    doc_status.update(
+                                        label=f"Translating section {idx + 1} "
+                                        f"of {n_sections}"
+                                    )
+                                    render_output(doc_output_placeholder, result)
+                                    last_rendered = idx
+                            render_output(doc_output_placeholder, result)
+                            doc_status.update(
+                                label=f"Translated {n_sections} {sections}"
+                            )
+                        if result.strip():
+                            st.session_state.doc_output = result
+                            record_document_provenance(
+                                doc_meta_slot,
+                                uploaded.name,
+                                st.session_state.doc_source_lang,
+                                st.session_state.doc_target_lang,
+                            )
+                        else:
+                            doc_warning_slot.warning(NO_OUTPUT_WARNING)
+                            _restore_doc_meta()
+                    except Exception as e:
+                        if result.strip():
+                            st.session_state.doc_output = result
+                            # A partial result is still downloadable, so it still needs
+                            # to say which file and pair it came from.
+                            record_document_provenance(
+                                doc_meta_slot,
+                                uploaded.name,
+                                st.session_state.doc_source_lang,
+                                st.session_state.doc_target_lang,
+                            )
+                            doc_warning_slot.error(
+                                f"Translation failed after partial output: {e}"
+                            )
+                        else:
+                            doc_warning_slot.error(f"Translation failed: {e}")
+                            _restore_doc_meta()
         else:
             # ensure_model returned None and has already reported it. Nothing
             # changed, so the caption cleared above the chain has to come back

@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import streamlit_app
 from streamlit_app import (
     LANGUAGES,
@@ -20,6 +22,7 @@ from streamlit_app import (
     heading_level,
     heading_line,
     is_blank_markdown,
+    is_pdf,
     leading_headings,
     load_document_markdown,
     pack_by_estimate,
@@ -479,10 +482,21 @@ def test_load_document_markdown_lets_an_ocr_failure_raise(
     # Only images run OCR, and an image has no text layer to fall back to, so
     # a non-fatal failure could only surface as "No translatable text found".
     # Leaving LiteParse's default (fatal) lets the tab report the real error.
-    mock_liteparse_cls.return_value.parse.return_value.text = "Body."
-    load_document_markdown(b"data")
+    from liteparse import ParseError
 
-    assert "ocr_failure_fatal" not in mock_liteparse_cls.call_args.kwargs
+    mock_liteparse_cls.return_value.parse.side_effect = ParseError("OCR failed")
+
+    with pytest.raises(ParseError):
+        load_document_markdown(b"\x89PNG fake")
+    assert mock_liteparse_cls.call_args.kwargs.get("ocr_failure_fatal") is not False
+
+
+def test_is_pdf_sniffs_the_magic_not_the_name() -> None:
+    assert is_pdf(b"%PDF-1.4\nrest of the file")
+    assert is_pdf(b"  \n%PDF-1.7")  # leading whitespace is tolerated
+    assert not is_pdf(b"\x89PNG\r\n\x1a\n")
+    assert not is_pdf(b"")
+    assert not is_pdf(b"PDF without the percent")
 
 
 @patch("liteparse.LiteParse")

@@ -9,8 +9,16 @@ from streamlit.testing.v1 import AppTest
 
 @pytest.fixture(autouse=True)
 def clear_st_cache() -> None:
-    """Clear Streamlit's @st.cache_resource between tests."""
+    """Clear both Streamlit caches between tests.
+
+    Both are process-global and outlive an AppTest instance. cache_data
+    matters for any test that drives cached_document_chunks: its key is
+    (file bytes, source language), and the fixtures reuse the same fake
+    bytes, so a stale entry would let a later test skip its own LiteParse
+    patch and pass or fail for a reason unrelated to what it asserts.
+    """
     st.cache_resource.clear()
+    st.cache_data.clear()
 
 
 @pytest.fixture
@@ -570,8 +578,8 @@ def test_document_ocr_failure_shows_the_error_not_the_blank_guard() -> None:
     # Only images run OCR, and an image has no text layer to fall back to.
     # With ocr_failure_fatal=False an uncached, unfetchable traineddata came
     # back as the empty fence, and the tab said "No translatable text found"
-    # about a scan it had never read. Left fatal, the real error reaches the
-    # same except that reports a model failure.
+    # about a scan it had never read. Left fatal, the real error is reported
+    # -- as a read failure, not a translation failure: no translation ran.
     from liteparse import ParseError
 
     def fake_liteparse(**kwargs: Any) -> MagicMock:
@@ -598,10 +606,55 @@ def test_document_ocr_failure_shows_the_error_not_the_blank_guard() -> None:
         at.button("translate_doc").click()
         at.run(timeout=60)
 
-    assert any("Translation failed: OCR failed" in str(e.value) for e in at.error)
+    errors = [str(e.value) for e in at.error]
+    assert any("Could not read the document: OCR failed" in v for v in errors)
+    assert not any("Translation failed" in v for v in errors)
     assert not any("No translatable text" in str(w.value) for w in at.warning)
     assert at.session_state["doc_output"] == ""
     assert at.get("download_button")[1].disabled  # ty: ignore[unresolved-attribute]
+
+
+def _translate_document_that_parses_to(name: str, data: bytes, text: str) -> AppTest:
+    """Upload ``data`` as ``name``, let LiteParse return ``text``, click Translate."""
+    parser = MagicMock()
+    parser.parse.return_value.text = text
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("liteparse.LiteParse", return_value=parser),
+    ):
+        at = AppTest.from_file("streamlit_app.py")
+        at.run(timeout=60)
+        at.get("file_uploader")[0].upload(name, data)  # ty: ignore[unresolved-attribute]
+        at.run(timeout=60)
+        at.button("translate_doc").click()
+        at.run(timeout=60)
+    return at
+
+
+def test_scanned_pdf_is_reported_as_having_no_text_layer() -> None:
+    # PDFs never run OCR (the offline policy), so a scan parses to the empty
+    # fence and used to be reported as blank. It is not blank, and "no
+    # translatable text" sent people looking for a fault in the file.
+    at = _translate_document_that_parses_to(
+        "scan.pdf", b"%PDF-1.4 fake", "```text\n\n```"
+    )
+
+    warnings = [str(w.value) for w in at.warning]
+    assert any("no text layer" in v for v in warnings)
+    assert not any("No translatable text" in v for v in warnings)
+    assert at.session_state["doc_output"] == ""
+
+
+def test_blank_image_is_reported_as_no_translatable_text() -> None:
+    # The same fence from an image means OCR ran and found nothing, which is
+    # what "no translatable text" was always meant to say.
+    at = _translate_document_that_parses_to(
+        "blank.png", b"\x89PNG fake", "```text\n\n```"
+    )
+
+    warnings = [str(w.value) for w in at.warning]
+    assert any("No translatable text" in v for v in warnings)
+    assert not any("no text layer" in v for v in warnings)
 
 
 # -- Stale state after a failed or empty translation ---------------------------
