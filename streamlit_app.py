@@ -310,7 +310,7 @@ def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> s
     # the machine, so PDFs -- the common case -- stay strictly offline.
     # ocr_failure_fatal=False so an OCR attempt that cannot fetch its data
     # never kills a parse whose text layer was readable all along.
-    # quiet=True keeps LiteParse's timing lines out of Streamlit's stdout.
+    # quiet=True keeps LiteParse's timing lines out of the server's stderr.
     parser = LiteParse(
         output_format="markdown",
         quiet=True,

@@ -109,8 +109,9 @@ def test_theme_config_has_theme_section() -> None:
 
 
 def test_theme_config_defines_light_and_dark_modes() -> None:
-    # Both variants must exist for Streamlit to show the light/dark switch;
-    # a lone [theme] section would lock the app to a single mode.
+    # At least one variant must exist for Streamlit to show the light/dark
+    # switch -- a lone [theme] section hides it and locks the app to a single
+    # mode; this project states both.
     theme = _load_theme_config()["theme"]
     assert "light" in theme
     assert "dark" in theme
@@ -441,7 +442,7 @@ def test_load_document_markdown_requests_quiet_markdown(
 
     kwargs = mock_liteparse_cls.call_args.kwargs
     assert kwargs["output_format"] == "markdown"
-    # quiet: LiteParse otherwise prints timing lines into Streamlit's stdout.
+    # quiet: LiteParse otherwise prints timing lines to the server's stderr.
     assert kwargs["quiet"] is True
 
 

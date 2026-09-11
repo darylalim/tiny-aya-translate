@@ -3,15 +3,19 @@
 # inherited. Note what this file does NOT earn: a repo with no config at all
 # still gets the full System/Light/Dark switch, so defining both sections is
 # not what surfaces it. What is true is narrower -- once a *custom* theme
-# exists at all, both [theme.light] and [theme.dark] must carry values or
-# Streamlit collapses the settings menu to a single locked "Custom Theme"
-# entry. Keeping the file is a choice to state the palette explicitly and give
+# exists at all, Streamlit drops its built-in presets, and the
+# System/Light/Dark radio is rendered only when more than one theme is
+# available: a lone [theme] leaves a single internal "Custom Theme" and no
+# radio at all, while any key in either [theme.light] or [theme.dark] yields
+# the three-entry list. Stating both is a choice, not a requirement.
+# Keeping the file is a choice to state the palette explicitly and give
 # the theme tests something to read; deleting it would look identical.
 # Typography, radii and link underlines are
 # deliberately absent so they fall back to Streamlit's defaults (Source Sans,
 # 16px base, underlined links).
 #
-# Values are Streamlit 1.61's built-in palette, by its own scale names:
+# Values are Streamlit's built-in palette (unchanged 1.61 through 1.63.0),
+# by its own scale names:
 #   red70 #ff4b4b · gray20 #f0f2f6 · gray85 #31333f
 #   gray90 #262730 · gray100 #0e1117 · gray10 #fafafa
 #   blue90 #0054a3 · blue60 #3d9df3
