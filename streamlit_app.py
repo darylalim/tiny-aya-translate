@@ -10,6 +10,17 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 # -- Config ------------------------------------------------------------------
 
 MODEL_ID: str = "mlx-community/tiny-aya-global-8bit-mlx"
+# The favicon is a local file, not a Material icon name: a `:material/…:`
+# page_icon makes Streamlit emit a <link rel="shortcut icon"> pointing at
+# fonts.gstatic.com, one outbound request per page load that the caption's
+# "nothing is sent to a server" does not cover. A .svg path is read and
+# inlined as a data: URL at set_page_config time, so nothing is fetched and
+# it renders offline. Resolved against this file, not the working directory:
+# `streamlit run` can be launched from any cwd (it never chdirs; the CLI
+# does abspath the script, so __file__ is absolute here), and a path that
+# does not resolve fails SILENTLY -- _get_favicon_string swallows the error
+# and emits the raw string as the favicon href.
+FAVICON_PATH: str = os.path.join(os.path.dirname(__file__), "assets", "favicon.svg")
 DEFAULT_TEMPERATURE: float = 0.1
 DEFAULT_MAX_TOKENS: int = 8192
 MAX_INPUT_TOKENS: int = 8192
@@ -759,7 +770,7 @@ import streamlit as st  # noqa: E402
 
 st.set_page_config(
     page_title="Tiny Aya Translate",
-    page_icon=":material/translate:",
+    page_icon=FAVICON_PATH,
     layout="wide",
 )
 

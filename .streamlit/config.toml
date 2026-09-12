@@ -12,8 +12,9 @@
 # the three-entry list. Stating both is a choice, not a requirement, and
 # here it is also how the two palettes stay designed rather than derived.
 #
-# Every ratio below was computed with the WCAG helper in
-# test_streamlit_app.py (lines 123-135), not estimated; "stock" means the
+# Every ratio below was computed with the WCAG helpers in
+# test_streamlit_app.py (_relative_luminance / _contrast_ratio, and
+# _composite for the alpha-derived tokens), not estimated; "stock" means the
 # previous file's values -- Streamlit's default palette -- through the same
 # helper. Derived states (hover, focus ring, caption, placeholder, borders,
 # skeleton, status tints) were emulated from the installed 1.63.0 bundle's
@@ -234,11 +235,28 @@
 #
 # SCREENSHOT -- the dark page is warm, and assets/screenshot.png will read
 # brown-tinted when embedded on GitHub's cool #0d1117 README ground. That
-# is the palette, not a colour-management fault. The profile-conditional
-# sRGB conversion the Screenshots section documents still applies (the
-# 2026-09-11 capture carried no embedded profile and needed none), and its
-# byte-exact checks are now #161412 (page), #2f2b27 (both panels) and
-# #33826f (the Translate fill, zero clip residue).
+# is the palette, not a colour-management fault. The pixel-sampled sRGB
+# conversion the Screenshots section documents still applies -- sample
+# first, convert only if the sample is off (the 2026-09-11 capture was
+# untagged and already byte-exact, so none ran) -- and its byte-exact checks
+# are #161412 (page), #2f2b27 (both panels) and #33826f (the Translate fill,
+# zero clip residue).
+
+# Not a theme key, but it belongs next to the fonts rule for the same reason:
+# with browser.gatherUsageStats at Streamlit's default (true) the frontend
+# fetches https://data.streamlit.io/metrics.json (once per browser, then
+# cached in localStorage as stMetricsConfig) and POSTs usage events to the
+# Fivetran webhook it names on every page load -- found live while verifying
+# that the favicon no longer fetched from fonts.gstatic.com. The caption
+# under the title says nothing is sent to a server; with this off, and the
+# favicon and fonts local, a page load makes no request that leaves the
+# machine (the model and OCR data downloads announce themselves). The one
+# server-side exception is not on the documented run path: starting with
+# --server.headless true, as the screenshot recipe does, makes bootstrap
+# GET http://checkip.amazonaws.com once to print an "External URL".
+# test_usage_stats_are_off guards the setting.
+[browser]
+gatherUsageStats = false
 
 [theme]
 headingFont = "serif"

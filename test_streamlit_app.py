@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
+import re
 import tomllib
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from streamlit.commands.page_config import _get_favicon_string
 
 import streamlit_app
 from streamlit_app import (
@@ -87,10 +89,22 @@ def test_warning_strings_defined_once() -> None:
 def test_set_page_config_sets_title_icon_and_wide_layout() -> None:
     # set_page_config must be the first Streamlit command; it defines the
     # browser-tab title, favicon, and the wide layout for the side-by-side panels.
+    # The favicon is a local SVG, deliberately not a `:material/…:` name: that
+    # form is fetched from fonts.gstatic.com on every page load, the one
+    # outbound request the caption's "nothing is sent to a server" would not
+    # cover. The path is pinned here and the file's existence below.
     assert "st.set_page_config(" in _APP_SOURCE
     assert 'page_title="Tiny Aya Translate"' in _APP_SOURCE
-    assert 'page_icon=":material/translate:"' in _APP_SOURCE
+    assert "page_icon=FAVICON_PATH" in _APP_SOURCE
     assert 'layout="wide"' in _APP_SOURCE
+    assert streamlit_app.FAVICON_PATH.endswith(os.path.join("assets", "favicon.svg"))
+    # Ask Streamlit's own resolver rather than sniffing the file: it inlines a
+    # readable SVG as a data: URL and hands back the raw path, silently, for a
+    # missing or malformed one -- so this one assertion covers the fresh-clone
+    # case, the SVG regex Streamlit applies, and that no Material name (which
+    # would resolve to a fonts.gstatic.com URL) is in play.
+    favicon = _get_favicon_string(streamlit_app.FAVICON_PATH)
+    assert favicon.startswith("data:image/svg+xml;base64,"), favicon[:60]
 
 
 # -- .streamlit/config.toml theme ----------------------------------------------
@@ -120,7 +134,21 @@ def test_theme_config_defines_light_and_dark_modes() -> None:
     assert "dark" in theme
 
 
+def _hex6(color: str) -> str:
+    # Streamlit accepts any CSS colour for a theme key, but this file only ever
+    # writes hex; expand the #rgb short form and lowercase so a valid spelling
+    # cannot crash a ratio test or fail an equality guard on case alone. Names
+    # like "teal" are rejected up front rather than mangled by the expansion.
+    color = color.strip().lower()
+    assert color.startswith("#"), f"not a hex colour: {color}"
+    if len(color) == 4:
+        color = "#" + "".join(c * 2 for c in color[1:])
+    assert re.fullmatch(r"#[0-9a-f]{6}", color), f"not a hex colour: {color}"
+    return color
+
+
 def _relative_luminance(hex_color: str) -> float:
+    hex_color = _hex6(hex_color)
     r, g, b = (int(hex_color[i : i + 2], 16) / 255 for i in (1, 3, 5))
 
     def _lin(c: float) -> float:
@@ -139,6 +167,7 @@ def _composite(fg: str, bg: str, alpha: float) -> str:
     # Streamlit derives several text tokens by painting textColor at a fixed
     # alpha over a background (caption 0.6, fadedText60/40); this is the colour
     # the browser actually shows for them.
+    fg, bg = _hex6(fg), _hex6(bg)
     channels = (
         round(alpha * int(fg[i : i + 2], 16) + (1 - alpha) * int(bg[i : i + 2], 16))
         for i in (1, 3, 5)
@@ -228,10 +257,9 @@ def test_code_background_matches_secondary_background() -> None:
     # is the guard.
     theme = _load_theme_config()["theme"]
     for mode in ("light", "dark"):
-        assert (
-            theme[mode]["codeBackgroundColor"]
-            == theme[mode]["secondaryBackgroundColor"]
-        ), mode
+        code = _hex6(theme[mode]["codeBackgroundColor"])
+        panel = _hex6(theme[mode]["secondaryBackgroundColor"])
+        assert code == panel, f"{mode}: codeBackgroundColor {code} != {panel}"
 
 
 def test_theme_fonts_are_bundled_not_fetched() -> None:
@@ -240,12 +268,32 @@ def test_theme_fonts_are_bundled_not_fetched() -> None:
     # and [[theme.fontFaces]] would need files this repo does not ship; the
     # generic names resolve to the Source Sans/Serif/Code files inside the
     # Streamlit wheel.
-    theme = _load_theme_config()["theme"]
-    assert "fontFaces" not in theme
-    for section in (theme, theme["light"], theme["dark"]):
-        for key, value in section.items():
-            if key.lower().endswith("font"):
-                assert "://" not in value, f"{key} fetches a font: {value}"
+    # Every nested table is walked -- [theme.sidebar] and the per-mode
+    # sidebars accept font sources too -- and `base` may only name a built-in:
+    # a URL base is fetched at config load, and a local file base could carry
+    # fontFaces of its own that this file never shows. This project inherits
+    # nothing, so the key is simply not allowed to point at a file.
+    def walk(table: dict[str, Any], path: str) -> None:
+        assert "fontFaces" not in table, f"{path} declares fontFaces"
+        base = table.get("base", "dark")
+        assert base in {"light", "dark"}, f"{path}.base inherits from a file: {base}"
+        for key, value in table.items():
+            if isinstance(value, dict):
+                walk(value, f"{path}.{key}")
+            elif key.lower().endswith("font"):
+                assert "://" not in str(value), f"{path}.{key} fetches: {value}"
+
+    walk(_load_theme_config()["theme"], "theme")
+
+
+def test_usage_stats_are_off() -> None:
+    # Streamlit's browser.gatherUsageStats defaults to true, and the frontend
+    # then fetches data.streamlit.io/metrics.json (once per browser; cached in
+    # localStorage as stMetricsConfig) and POSTs usage events to the Fivetran
+    # webhook it names on every page load. The caption under the title says
+    # nothing is sent to a server, so it is pinned off here.
+    config = _load_theme_config()
+    assert config.get("browser", {}).get("gatherUsageStats") is False
 
 
 # -- LANGUAGES -----------------------------------------------------------------
