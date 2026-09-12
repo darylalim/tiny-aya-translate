@@ -1233,28 +1233,31 @@ def test_document_tab_loads_model_into_its_own_status_slot() -> None:
 
 
 def test_spinner_slots_are_empty_elements_not_containers() -> None:
-    # The two slots ensure_model's spinner lands in must be st.empty(), not
-    # st.container(). Since Streamlit 1.53 the spinner is a transient element
-    # that sends its clear message unconditionally; on a warm cache the spinner
-    # never paints, but the clear still lands, and the frontend appends it to a
-    # container as a childless node -- enough to stop the block counting as
-    # empty, so it rendered as a 0px flex item plus the column's 16px gap. On
-    # the Text tab that shifted both panels down for the whole run; on the
-    # Document tab the gap outlived the run on the exits that write nothing
-    # else into the slot. An st.empty() already occupies the slot, so the
-    # transient anchors onto it and the display:none element takes no space.
-    # AppTest renders no layout, so only the source can hold this. Anchored at
-    # line start rather than matched in the compact form, because the compact
-    # `doc_warning_slot=st.container()` -- which is a container, and rightly:
-    # it only ever receives real elements -- contains `warning_slot=st.container()`
-    # as a substring, so a compact `not in` check would fail on the one slot
-    # that is meant to stay a container. Exactly one assignment each, and it
-    # must be the empty element.
-    def assignments(name: str) -> list[str]:
-        return re.findall(rf"^\s*{name}\s*=\s*(st\.\w+\(\))", _APP_SOURCE, re.M)
-
-    assert assignments("warning_slot") == ["st.empty()"]
-    assert assignments("doc_status_slot") == ["st.empty()"]
+    # Every slot a spinner lands in must be an st.empty(), never an
+    # st.container(): a transient spinner's clear message leaves a container
+    # with a phantom child that holds the column's 16px gap for the run --
+    # mechanism and measurements at warning_slot in streamlit_app.py. AppTest
+    # renders no layout, so only the source can hold this.
+    #
+    # The names come from the call sites, not a hand-written list: the
+    # argument of every ensure_model(...) call, plus every `with x.spinner(`
+    # receiver other than ensure_model's own parameter (which those arguments
+    # feed). A new slot handed a spinner is caught automatically, and a
+    # renamed slot cannot slip past a stale list. Anchored at line start
+    # rather than matched in the compact form, because the compact
+    # `doc_warning_slot=st.container()` -- a container, and rightly: it only
+    # ever receives real elements -- contains `warning_slot=st.container()` as
+    # a substring. Any DG's .empty() passes; exactly one assignment each.
+    src = _APP_SOURCE
+    param_match = re.search(r"^def ensure_model\((\w+)", src, re.M)
+    assert param_match is not None
+    receivers = set(re.findall(r"(?<!def )ensure_model\((\w+)\)", src))
+    receivers |= set(re.findall(r"^\s*with (\w+)\.spinner\(", src, re.M))
+    receivers -= {param_match.group(1)}
+    assert receivers == {"warning_slot", "doc_status_slot"}
+    for name in receivers:
+        callees = re.findall(rf"^\s*{name}\s*=\s*(\w+\.\w+)\(\s*\)", src, re.M)
+        assert len(callees) == 1 and callees[0].endswith(".empty"), (name, callees)
 
 
 # -- translate_document --------------------------------------------------------

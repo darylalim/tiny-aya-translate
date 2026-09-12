@@ -775,7 +775,14 @@ st.set_page_config(
 )
 
 
-@st.cache_resource
+# show_spinner=False: on a cache miss the decorator's default paints its own
+# "Running `load_model()`." spinner at the script cursor -- which, inside a
+# translate handler, is below the controls row on the Text tab and below the
+# output panel on the Document tab. ensure_model already shows the one
+# indicator for the load, in the slot above the panels; reproduced on a cold
+# cache, the default painted a second spinner under the buttons for the whole
+# load, the off-the-fold position ensure_model exists to avoid.
+@st.cache_resource(show_spinner=False)
 def load_model() -> tuple[Any, Any]:
     """Load model and tokenizer once, cached for the session lifetime."""
     from mlx_lm import load
@@ -836,8 +843,8 @@ def record_document_provenance(
     slot.caption(st.session_state.doc_meta)
 
 
-def ensure_model(warning_container: Any) -> tuple[Any, Any] | None:
-    """Load the model on demand, reporting into ``warning_container``.
+def ensure_model(slot: Any) -> tuple[Any, Any] | None:
+    """Load the model on demand, reporting into ``slot`` -- an ``st.empty()``.
 
     Called from the translate handlers rather than at page load. The weights are
     ~3.6 GB, so loading them before the tabs render left the user watching a
@@ -846,14 +853,14 @@ def ensure_model(warning_container: Any) -> tuple[Any, Any] | None:
     user, not per-session -- so the load happens once per server process, at the
     first translation rather than at startup.
 
-    The spinner is rendered into ``warning_container`` rather than at the script
-    cursor. Inside a translate handler that cursor sits below the panels and the
+    The spinner is rendered into ``slot`` rather than at the script cursor.
+    Inside a translate handler that cursor sits below the panels and the
     controls row, so a bare ``st.spinner`` put the only sign of activity below
-    the fold while the error landed at the top of the tab. Both callers hand it
-    an ``st.empty()``, not an ``st.container()``: the spinner is transient, and
-    the clear message it always sends left a container with a phantom child that
-    held a 16px gap for the rest of the run -- see ``warning_slot`` on the Text
-    tab for the mechanism.
+    the fold while the error landed at the top of the tab. ``slot`` must be an
+    ``st.empty()``, not an ``st.container()``: the spinner is transient, and the
+    clear message it always sends leaves a container with a phantom child that
+    holds a 16px gap for the rest of the run -- mechanism at ``warning_slot`` on
+    the Text tab. On the Document tab it is the status slot, not a warning one.
 
     Returns ``None`` when the load fails, having already written the error into
     that same slot. There is no cheap way to know the model loads without
@@ -867,14 +874,14 @@ def ensure_model(warning_container: Any) -> tuple[Any, Any] | None:
         # seconds; an unqualified "Loading model..." with no elapsed time is
         # indistinguishable from a hang. show_time and the size both come from
         # the README's own promise about that first click.
-        with warning_container.spinner(
+        with slot.spinner(
             "Loading model... the first run downloads ~3.6 GB from Hugging Face",
             show_time=True,
         ):
             return load_model()
     except Exception as e:
         # Keep the "Failed to load model: " prefix -- a UI test matches on it.
-        warning_container.error(
+        slot.error(
             f"Failed to load model: {e}\n\nThe first run downloads ~3.6 GB from "
             "Hugging Face. Check your connection and disk space, then click "
             "Translate again."
@@ -1051,11 +1058,16 @@ with text_tab:
     # container that is otherwise not rendered at all was painted as a 0px flex
     # item, and the tab column's 16px gap wrapped it: measured, both panels sat
     # 16px lower from 178 ms after the click until the closing st.rerun()
-    # rebuilt the tree. An empty element already occupies child 0, so the
-    # transient anchors onto it instead, and its container is display:none --
-    # no phantom, warm or cold; a spinner that does paint still clears cleanly.
+    # rebuilt the tree (without a rerun, the end-of-run stale sweep removes it
+    # instead -- either way it lives exactly as long as the run). An st.empty()
+    # has no child slots: its clear is addressed to the empty element's own
+    # path in the parent block, so the transient anchors onto the element that
+    # is already there, and that element's container is display:none -- no
+    # phantom, warm or cold; a spinner that does paint still clears cleanly.
     # Holding one element costs nothing: every writer below is in an if/elif
     # chain, and the notice drain fires on the run *after* the one that set it.
+    # This comment is the record of the mechanism; the Document tab's status
+    # slot, ensure_model, the guard test and CLAUDE.md all point here.
     warning_slot = st.empty()
     # Drain any notice left by the previous run's translate block. Read once
     # and cleared, so it survives exactly the one rerun it was raised for.
@@ -1394,13 +1406,12 @@ with doc_tab:
     # output for the same reason ensure_model's spinner is: once the first
     # chunk lands, the output panel is PANEL_HEIGHT tall, so anything created
     # at the script cursor below it spends the whole run off the fold.
-    # st.empty() for the reason the Text tab's warning_slot is: two instant
-    # spinners land here on a warm cache (the model load and "Reading
-    # document..."), and in a container their clear messages left a phantom
-    # child holding a 16px gap above the output on every exit that writes
-    # nothing else here -- a read failure and the blank guard -- with no
-    # st.rerun() on this tab to ever remove it. The status block, and
-    # ensure_model's error, replace the element in turn, one per run.
+    # st.empty(), not st.container(): the mechanism is recorded at the Text
+    # tab's warning_slot. Two instant spinners land here on a warm cache (the
+    # model load and "Reading document..."), and in a container their clear
+    # messages left a phantom child holding a 16px gap above the output for
+    # the run. The status block, and ensure_model's error, replace the element
+    # in turn, one per run.
     doc_status_slot = st.empty()
     doc_meta_slot = st.empty()
     doc_output_placeholder = st.empty()
