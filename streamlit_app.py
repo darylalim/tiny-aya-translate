@@ -6,14 +6,29 @@ from typing import Any
 
 # Mute transformers alias-warning spam triggered by Streamlit's module watcher.
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+# huggingface_hub reads both of these once, at import, and mlx_lm.load resolves
+# MODEL_ID's `main` with one GET to huggingface.co on the first Translate of
+# every server process, warm cache included. The model is public, so a cached
+# `hf auth login` token has no business riding along as `Authorization: Bearer`
+# -- the same flag is checked before get_token(), so it also skips the OAuth
+# refresh POST that call can make. Telemetry off drops the daily
+# /api/agent-harnesses fetch and the `agent/<harness>` User-Agent segment.
+# Neither stops the GET itself; only a pinned commit `revision=` does that
+# without also breaking the cold download (HF_HUB_OFFLINE=1 stops both).
+# setdefault leaves a shell override in force, which is also the escape hatch
+# if MODEL_ID is ever swapped for a gated model: export
+# HF_HUB_DISABLE_IMPLICIT_TOKEN=0. HF_TOKEN alone is ignored -- the flag is
+# checked before get_token(), the only reader of HF_TOKEN.
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 # -- Config ------------------------------------------------------------------
 
 MODEL_ID: str = "mlx-community/tiny-aya-global-8bit-mlx"
 # The favicon is a local file, not a Material icon name: a `:material/…:`
 # page_icon makes Streamlit emit a <link rel="shortcut icon"> pointing at
-# fonts.gstatic.com, one outbound request per page load that the caption's
-# "nothing is sent to a server" does not cover. A .svg path is read and
+# fonts.gstatic.com, one outbound request per page load that the README's
+# privacy promise does not cover. A .svg path is read and
 # inlined as a data: URL at set_page_config time, so nothing is fetched and
 # it renders offline. Resolved against this file, not the working directory:
 # `streamlit run` can be launched from any cwd (it never chdirs; the CLI
@@ -892,11 +907,6 @@ def ensure_model(slot: Any) -> tuple[Any, Any] | None:
 # -- Main page ----------------------------------------------------------------
 
 st.title("Tiny Aya Translate")
-# "sent to a server", not "sent anywhere": the model-load spinner and the
-# Document tab's OCR notice both announce downloads, so an absolute claim
-# would read as a contradiction two clicks later. Outbound is the property
-# a user is actually deciding about when they paste text in.
-st.caption("67 languages, translated on your Mac — nothing is sent to a server.")
 
 # -- Session state defaults ---------------------------------------------------
 

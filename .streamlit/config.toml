@@ -36,14 +36,14 @@
 # concrete, because three text surfaces are derived from textColor at a
 # fixed alpha and nothing else reaches them: st.caption paints textColor at
 # opacity 0.6 (never grayTextColor), which stock light left at 3.69:1 --
-# the documented, accepted AA miss on the subtitle and the Document tab's
-# provenance line; the enabled text_area's placeholder ("Enter text to
-# translate ...") and the uploader's size/type hint are fadedText60, the
-# same ink at 60% over the panel. An earlier draft used the dark page
-# colour #161412 as the ink for symmetry, and it left that placeholder at
-# 4.43:1; #0e0d0b lifts it to #66635e, 4.77:1, and the caption to #6c6a66,
-# 4.96:1, so both clear AA in both modes (dark: caption #949088 5.78:1,
-# placeholder #9e9990 4.96:1). textColor and backgroundColor are the only
+# the documented, accepted AA miss on the Document tab's provenance line;
+# the enabled text_area's placeholder ("Enter text to translate ...") and
+# the uploader's size/type hint are fadedText60, the same ink at 60% over
+# the panel. An earlier draft used the dark page colour #161412 as the ink
+# for symmetry, and it left that placeholder at 4.43:1; #0e0d0b lifts it to
+# #66635e, 4.77:1, and the caption to #6c6a66, 4.96:1, so both clear AA in
+# both modes (dark: caption #949088 5.78:1, placeholder #9e9990 4.96:1).
+# textColor and backgroundColor are the only
 # keys that reach any of them; an earlier CLAUDE.md's "nothing in config.toml
 # can reach it" was true of a colour directive, not of the ink the text is
 # derived from.
@@ -182,10 +182,10 @@
 #
 # TYPE -- two keys, both fonts bundled in the Streamlit wheel
 # (static/media/SourceSerifVariable-Roman.*.woff2, SourceSansVF-Upright.*.woff2),
-# zero network. The caption under the title ("nothing is sent to a server")
-# makes that a hard rule: a Google Fonts URL fires on every page load. The
-# bundle maps the generic names itself -- "serif" resolves to Source Serif,
-# "sans-serif" to Source Sans -- so no fontFaces block is needed.
+# zero network. The README's privacy promise makes that a hard rule: a
+# Google Fonts URL fires on every page load. The bundle maps the generic
+# names itself -- "serif" resolves to Source Serif, "sans-serif" to Source
+# Sans -- so no fontFaces block is needed.
 # headingFont = "serif" sets the title -- the page's only heading, and the
 # only thing on it that can carry an identity, since there is no logo -- in
 # Source Serif, Source Sans's sibling family. It touches nothing else: tabs,
@@ -247,11 +247,11 @@
 # fetches https://data.streamlit.io/metrics.json (once per browser, then
 # cached in localStorage as stMetricsConfig) and POSTs usage events to the
 # Fivetran webhook it names on every page load -- found live while verifying
-# that the favicon no longer fetched from fonts.gstatic.com. The caption
-# under the title says nothing is sent to a server; with this off, and the
-# favicon and fonts local, a page load makes no request that leaves the
-# machine (the model and OCR data downloads announce themselves). The one
-# server-side exception is not on the documented run path: starting with
+# that the favicon no longer fetched from fonts.gstatic.com. The README's
+# privacy promise applies here too; with this off, and the favicon and
+# fonts local, a page load makes no request that leaves the machine (the
+# model and OCR data downloads announce themselves). The one server-side
+# exception is not on the documented run path: starting with
 # --server.headless true, as the screenshot recipe does, makes bootstrap
 # GET http://checkip.amazonaws.com once to print an "External URL".
 # test_usage_stats_are_off guards the setting.

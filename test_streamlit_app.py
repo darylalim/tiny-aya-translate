@@ -45,6 +45,20 @@ def test_transformers_verbosity_is_set() -> None:
     assert os.environ.get("TRANSFORMERS_VERBOSITY")
 
 
+def test_hub_requests_are_anonymous_and_untracked() -> None:
+    # mlx_lm.load resolves MODEL_ID's `main` with a GET to huggingface.co on
+    # every server process's first Translate; these keep a cached `hf auth
+    # login` token and the agent-harness telemetry out of it. huggingface_hub
+    # reads both at import, so the check goes through its constants rather
+    # than os.environ: a hub import that beat the setdefault would pass an
+    # environ check and still send the token. A shell that exports either as
+    # a false value fails this on purpose.
+    from huggingface_hub import constants
+
+    assert constants.HF_HUB_DISABLE_IMPLICIT_TOKEN is True
+    assert constants.HF_HUB_DISABLE_TELEMETRY is True
+
+
 # -- streamlit_app.py width API ------------------------------------------------
 
 _APP_SOURCE = (Path(__file__).parent / "streamlit_app.py").read_text(encoding="utf-8")
@@ -91,8 +105,8 @@ def test_set_page_config_sets_title_icon_and_wide_layout() -> None:
     # browser-tab title, favicon, and the wide layout for the side-by-side panels.
     # The favicon is a local SVG, deliberately not a `:material/…:` name: that
     # form is fetched from fonts.gstatic.com on every page load, the one
-    # outbound request the caption's "nothing is sent to a server" would not
-    # cover. The path is pinned here and the file's existence below.
+    # outbound request the README's privacy promise would not cover. The path
+    # is pinned here and the file's existence below.
     assert "st.set_page_config(" in _APP_SOURCE
     assert 'page_title="Tiny Aya Translate"' in _APP_SOURCE
     assert "page_icon=FAVICON_PATH" in _APP_SOURCE
@@ -238,9 +252,9 @@ def test_link_text_readable_in_both_modes() -> None:
 
 def test_caption_readable_in_both_modes() -> None:
     # st.caption paints textColor at opacity 0.6 over the page (it never reads
-    # grayTextColor), so the subtitle and the Document tab's provenance line are
-    # this composite. Stock light sat at 3.69:1 — a documented, accepted gap;
-    # the ink is now chosen so both modes clear AA (4.96 light / 5.78 dark).
+    # grayTextColor), so the Document tab's provenance line is this composite.
+    # Stock light sat at 3.69:1 — a documented, accepted gap; the ink is now
+    # chosen so both modes clear AA (4.96 light / 5.78 dark).
     theme = _load_theme_config()["theme"]
     for mode in ("light", "dark"):
         text, bg = theme[mode]["textColor"], theme[mode]["backgroundColor"]
@@ -263,9 +277,9 @@ def test_code_background_matches_secondary_background() -> None:
 
 
 def test_theme_fonts_are_bundled_not_fetched() -> None:
-    # The caption under the title promises nothing is sent to a server. A
-    # Google Fonts URL in font/headingFont/codeFont fires on every page load,
-    # and [[theme.fontFaces]] would need files this repo does not ship; the
+    # The README's privacy promise rules out network fonts: a Google Fonts URL
+    # in font/headingFont/codeFont fires on every page load, and
+    # [[theme.fontFaces]] would need files this repo does not ship; the
     # generic names resolve to the Source Sans/Serif/Code files inside the
     # Streamlit wheel.
     # Every nested table is walked -- [theme.sidebar] and the per-mode
@@ -290,8 +304,8 @@ def test_usage_stats_are_off() -> None:
     # Streamlit's browser.gatherUsageStats defaults to true, and the frontend
     # then fetches data.streamlit.io/metrics.json (once per browser; cached in
     # localStorage as stMetricsConfig) and POSTs usage events to the Fivetran
-    # webhook it names on every page load. The caption under the title says
-    # nothing is sent to a server, so it is pinned off here.
+    # webhook it names on every page load. The README's privacy promise pins
+    # it off here.
     config = _load_theme_config()
     assert config.get("browser", {}).get("gatherUsageStats") is False
 
@@ -601,8 +615,8 @@ def test_load_document_markdown_keeps_pdfs_offline(
     mock_liteparse_cls: MagicMock,
 ) -> None:
     # A PDF carries a real text layer, and LiteParse's auto OCR downloads ~15 MB
-    # of Tesseract training data from GitHub the first time it fires. This app
-    # promises nothing leaves the machine, so the common path stays offline.
+    # of Tesseract training data from GitHub the first time it fires. The
+    # README's privacy promise keeps the common path offline.
     mock_liteparse_cls.return_value.parse.return_value.text = "Body."
     load_document_markdown(b"%PDF-1.4\nrest of the file")
 
