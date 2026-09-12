@@ -1069,12 +1069,22 @@ with text_tab:
         # streaming path already uses, and the one the Document tab uses for
         # both states. Previously the panel swapped to a disabled text_area the
         # instant streaming ended, changing font, weight and colour in one
-        # frame: Streamlit paints disabled content at fadedText40, measured
-        # 2.17:1 light and 3.53:1 dark, so the finished translation was *less*
-        # legible than the placeholder that preceded it, and a disabled
-        # textarea is unselectable, so it could not even be copied.
+        # frame: Streamlit paints disabled content at fadedText40, which
+        # measured 2.17:1 light and 3.53:1 dark under the stock Streamlit theme
+        # the app shipped with at the time, so the finished translation was
+        # *less* legible than the placeholder that preceded it, and a disabled
+        # textarea is unselectable, so it could not even be copied. Those two
+        # figures are history, not a live measurement: under the Reading Room
+        # theme the same token composites over the panel to #938f87, 2.57:1
+        # light, and #79746d, 3.03:1 dark -- still not a surface to settle
+        # prose on, so the swap stays gone. (The font half of that frame is
+        # also gone on its own: codeFont = "sans-serif" sets this st.code
+        # panel in Source Sans at the input's 14px.)
         # The text_area survives as the empty state only, where it supplies the
-        # placeholder and balances the input panel opposite it.
+        # placeholder and balances the input panel opposite it; its
+        # "Translation appears here" is painted at that same fadedText40, so
+        # the 2.57/3.03 are what it reads at -- disabled text is exempt from
+        # SC 1.4.3, and it is read once.
         if st.session_state.translate_output:
             render_output(output_placeholder, st.session_state.translate_output)
         else:
@@ -1300,16 +1310,27 @@ with doc_tab:
         # -- Tesseract returns confident garbage that sails past the "no
         # translatable text" guard -- so the coupling has to be stated.
         #
-        # st.info, not st.caption, and the reason is contrast, not emphasis.
-        # st.caption renders as opacity 0.6 on inherited body text -- `color:
-        # inherit` plus `opacity`, never reading the grayTextColor key, which
-        # exists and holds the same value -- landing textColor #31333f on
-        # #ffffff at 3.69:1 in light, under AA's 4.5:1 for 14px. Nothing in
-        # config.toml reaches it: a markdown color directive is multiplied by
-        # the same opacity and comes out worse. st.info paints blueTextColor
-        # on blueBackgroundColor, 6.68:1 light and 4.90:1 dark, and design.md
-        # files instructions under info and metadata under caption. This is an
-        # instruction with a silent-failure mode and a network side effect.
+        # st.info, not st.caption. The reason used to be contrast, and it no
+        # longer is; what survives is design.md's rule, stated at the end.
+        # The history: st.caption renders as opacity 0.6 on inherited body
+        # text -- `color: inherit` plus `opacity`, never reading the
+        # grayTextColor key, which exists and holds the same value -- and under
+        # the stock Streamlit theme that landed textColor #31333f on #ffffff at
+        # 3.69:1 in light, under AA's 4.5:1 for 14px, while st.info painted
+        # stock blueTextColor on blueBackgroundColor at 6.68:1 light and 4.90:1
+        # dark. "Nothing in config.toml reaches it" was true of a markdown
+        # colour directive, which is multiplied by the same opacity and comes
+        # out worse, and false of the ink the caption is derived from:
+        # textColor and backgroundColor are the only keys that reach it, and
+        # the Reading Room theme's ink was chosen so the 0.6 composite clears
+        # AA in both modes -- #6c6a66 on #f8f5ef, 4.96:1 light; #949088 on
+        # #161412, 5.78:1 dark (test_caption_readable_in_both_modes guards
+        # it). A caption would now be legible here. It is still st.info
+        # because design.md files instructions under info and metadata under
+        # caption, and this is an instruction with a silent-failure mode and a
+        # network side effect. The box itself is stated in the theme rather
+        # than derived -- slate #2b547f on #e3e8ec, 6.36:1 light; #a4c2e2 on
+        # #2b3138, 7.12:1 dark -- see config.toml's STATUS BOXES block for why.
         st.info(
             "Scans are read with OCR in the source language — the first scan "
             "in a new language downloads ~15 MB of OCR data.",

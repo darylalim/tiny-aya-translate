@@ -1,52 +1,269 @@
-# Streamlit's own theme for Tiny Aya Translate — dual light/dark mode.
-# These are Streamlit's stock default colors, stated explicitly rather than
-# inherited. Note what this file does NOT earn: a repo with no config at all
-# still gets the full System/Light/Dark switch, so defining both sections is
-# not what surfaces it. What is true is narrower -- once a *custom* theme
-# exists at all, Streamlit drops its built-in presets, and the
-# System/Light/Dark radio is rendered only when more than one theme is
+# "Reading Room" -- Tiny Aya Translate's own theme, dual light/dark mode,
+# dark-first. A warm-neutral ink-and-paper palette for a page whose whole
+# surface is two 450px panels of prose in any of 67 scripts, with one
+# verdigris accent used as rubrication rather than as a brand. Both modes
+# are stated in full. Note what that does NOT earn: a repo with no config at
+# all still gets the full System/Light/Dark switch, so defining both
+# sections is not what surfaces it. What is true is narrower -- once a
+# *custom* theme exists at all, Streamlit drops its built-in presets, and
+# the System/Light/Dark radio is rendered only when more than one theme is
 # available: a lone [theme] leaves a single internal "Custom Theme" and no
 # radio at all, while any key in either [theme.light] or [theme.dark] yields
-# the three-entry list. Stating both is a choice, not a requirement.
-# Keeping the file is a choice to state the palette explicitly and give
-# the theme tests something to read; deleting it would look identical.
-# Typography, radii and link underlines are
-# deliberately absent so they fall back to Streamlit's defaults (Source Sans,
-# 16px base, underlined links).
+# the three-entry list. Stating both is a choice, not a requirement, and
+# here it is also how the two palettes stay designed rather than derived.
 #
-# Values are Streamlit's built-in palette (unchanged 1.61 through 1.63.0),
-# by its own scale names:
-#   red70 #ff4b4b · gray20 #f0f2f6 · gray85 #31333f
-#   gray90 #262730 · gray100 #0e1117 · gray10 #fafafa
-#   blue90 #0054a3 · blue60 #3d9df3
-# linkColor is Streamlit's resolved blueTextColor for each mode.
+# Every ratio below was computed with the WCAG helper in
+# test_streamlit_app.py (lines 123-135), not estimated; "stock" means the
+# previous file's values -- Streamlit's default palette -- through the same
+# helper. Derived states (hover, focus ring, caption, placeholder, borders,
+# skeleton, status tints) were emulated from the installed 1.63.0 bundle's
+# own colour functions (getColors.CymiOtHO.js: darken/lighten are HSL with
+# integer-rounded hsla() output, transparentize is a straight alpha) and
+# match the numbers a browser paints. Stock is in git history if wanted.
 #
-# codeBackgroundColor is the ONE deliberate departure from stock, and the reason
-# is now SPATIAL, not temporal. It used to be temporal: the Text tab streamed
-# into st.code and then swapped in a settled, disabled text_area, so the panel
-# changed shade the instant a translation finished. That swap is gone -- settled
-# output renders through st.code too -- so do not go looking for it.
+# NEUTRALS -- ink and paper, not white on black. Dark mode paints #e8e2d6
+# on #161412 (14.24:1) and on the panels' #2f2b27 (10.88:1); stock was
+# #fafafa on #0e1117 at 18.11:1 and 14.22:1. The drop is deliberate:
+# near-white on near-black is the pair that halates (strokes bloom) over a
+# long read, and 10-14:1 is where dark-mode prose is set by people who set
+# prose -- still past the 7:1 AAA bar. The page is one step darker than the
+# #1a1816 an earlier draft used, for the accent's sake (see ACCENT); it is
+# the same depth as stock's #0e1117 (luminance 0.0072 vs 0.0056), warm
+# instead of blue. Light mode is the same scale turned over: ink #0e0d0b
+# on paper #f8f5ef (17.85:1) and panel #ebe5da (15.50:1). Ink on paper is
+# the one pair a printer does not soften, and the darkness buys something
+# concrete, because three text surfaces are derived from textColor at a
+# fixed alpha and nothing else reaches them: st.caption paints textColor at
+# opacity 0.6 (never grayTextColor), which stock light left at 3.69:1 --
+# the documented, accepted AA miss on the subtitle and the Document tab's
+# provenance line; the enabled text_area's placeholder ("Enter text to
+# translate ...") and the uploader's size/type hint are fadedText60, the
+# same ink at 60% over the panel. An earlier draft used the dark page
+# colour #161412 as the ink for symmetry, and it left that placeholder at
+# 4.43:1; #0e0d0b lifts it to #66635e, 4.77:1, and the caption to #6c6a66,
+# 4.96:1, so both clear AA in both modes (dark: caption #949088 5.78:1,
+# placeholder #9e9990 4.96:1). textColor and backgroundColor are the only
+# keys that reach any of them; an earlier CLAUDE.md's "nothing in config.toml
+# can reach it" was true of a colour directive, not of the ink the text is
+# derived from.
+#
+# PANEL SEPARATION -- showWidgetBorder stays at its default (false), so the
+# text_area and st.code panels are separated from the page by fill alone.
+# It is not a lever for stronger edges here: st.code's <pre> paints
+# codeBackgroundColor, bodyText and a radius with NO border property at all
+# (ErrorElement.CZxpg0mG.js, target e1bckg3e2), while the text_area's border
+# is widgetBorderColor, so turning the flag on would outline the input and
+# not the output beside it -- in the one row the codeBackgroundColor pin
+# below exists to keep uniform. Dark secondaryBackgroundColor vs
+# backgroundColor is 1.31:1 (stock 1.27), light 1.15:1 (stock 1.12). The
+# dark panel goes no lighter because the accent's 1px focus border has to
+# clear 3:1 against it (3.05:1, see ACCENT) and no darker because the
+# empty-state placeholder ("Translation appears here") renders at
+# fadedText40 over the panel: #79746d, 3.03:1 (stock 3.53). That token is
+# not the ::placeholder rule (which says fadedText60) but the disabled
+# textarea's -webkit-text-fill-color, which the pseudo-element inherits and
+# which wins over color; disabled text is exempt, but it is meant to be
+# read once. Light mode's equivalent is #938f87, 2.57:1 (stock 2.17), left
+# under 3:1 as stock leaves it. The other bg-derived tokens, none reachable
+# from a key: borderColor is fadedText10, which despite the name is
+# textColor at 20% alpha (transparentize .8), so the picker card's stroke
+# and the Download button's outline are warm hairlines -- #403d39 dark
+# (1.70:1 vs page, stock 1.81; the browser composites it to #403d38, one
+# 8-bit step off), #c9c7c1 light (1.55:1, stock 1.45). The enabled Download
+# fill is lightenedBg05 (HSL lighten 2.5%), #1c1a17 dark (painted #1c1917),
+# 1.06:1 vs page, so the outline is the button, exactly as under stock
+# (1.05) -- and at rest Download (and Translate document before an upload)
+# is disabled, which paints a transparent fill, the borderColor hairline
+# and a fadedText40 label (#6a6660, 3.22:1 dark; #9a9894, 2.65:1 light).
+# The st.skeleton that fills the output panel during translation
+# and the selectbox option highlight are darkenedBgMix15: #2f2d2a over the
+# dark page, 1.34:1 (stock 1.30), #f0e9de over the paper, 1.11:1. If the
+# dark step ever needs to move, #342f2b gives 1.39 but puts the focus
+# border at 2.87 and the placeholder at 2.98; the constraint is real.
+#
+# ACCENT -- verdigris, #33826f dark (hsl 166/44/35) and #287160 light
+# (hsl 166/48/30): one hue at two values, and not a brand red, because
+# nothing here has a brand. Hue 166 is chosen to sit far from st.info's
+# blue (~211 on this theme) and Streamlit's success green (~140), so the
+# persistent OCR notice on the Document tab can never read as the accent.
+# Its job is rubrication -- the active tab label and its 2px indicator, the
+# focus border on the text areas and selectboxes, the focus ring, and the
+# one filled button. Two things painted in it are TEXT under WCAG SC 1.4.3:
+# Streamlit paints the primary button's label white (fixed, not themeable),
+# and paints the active tab label in primaryColor as 14px/400 text on
+# backgroundColor. White-on-primary >= 4.5 needs L(primary) <= 0.1833;
+# primary-on-page >= 4.5 on #161412 needs L >= 0.2072. Both cannot hold on
+# any ordinary dark ground (the best a single colour can do for both on
+# this page is 4.29), so a side is picked, and BOTH numbers are stated:
+#   dark   white on #33826f   (Translate label, 14px/400)   4.60:1  passes
+#   dark   #33826f on #161412 (active tab label, 14px/400)  3.99:1  FAILS AA
+#   dark   #33826f on #2f2b27 (1px focus border, SC 1.4.11) 3.05:1  passes
+#   dark   hover = darken 15% = #1d493f, white on it        10.11:1 passes
+#   light  white on #287160                                  5.80:1  passes
+#   light  #287160 on #f8f5ef                                5.33:1  passes
+#   light  #287160 on #ebe5da (focus border)                 4.63:1  passes
+#   light  hover = #143930, white on it                     12.67:1 passes
+# The BUTTON side wins in dark mode. Its label is the only text on that
+# surface and the only thing that says what the click does; the active tab
+# is named three times over -- by its indicator (3.99:1 clears the 3:1
+# non-text floor), by its position, and by the content already showing
+# under it -- and in light mode both pairs want a dark accent, so both pass
+# and stock's two knowing failures at 3.30 are gone. It is also the side
+# the project asked for: the button-label test had been lowered from 4.5
+# to 3.0 for stock's 3.30, and it is back at a real 4.5 (renamed
+# test_primary_button_label_readable_in_both_modes). Stock dark
+# had this the other way round (button 3.30, tab 5.72), and so did the
+# earlier draft of this theme at #4a9685 (3.50 / 5.24 on this page, focus
+# border 4.01, hover 2.67 vs page): the tab side keeps the selected tab
+# closer to the inactive ones, which Streamlit paints at full textColor,
+# and keeps the hover fill from sinking -- real costs, taken here in
+# exchange for a legible primary action. The balance point,
+# #3a8876, is 4.23 / 4.34 / 3.32: both pairs within 0.3 of AA, neither
+# passing, and no test restorable; rejected for that reason.
+# What the button side costs, measured: the selected tab is dimmer than
+# the inactive tabs (3.99 vs 14.24) and carries it on chroma and the
+# indicator; the hover fill #1d493f sits at 1.82:1 against the dark page
+# (stock's #ff0000 held 4.73, the earlier draft 2.67), so a hovered
+# Translate reads pressed-in rather than lit -- transient, and the label at
+# 10.11 carries it, but move the pointer off the button before a
+# screenshot, as CLAUDE.md already says. The 50%-alpha focus ring
+# (shadows.focusRing) is #244b40 on the dark page, 1.89:1, and #90b3a8 on
+# the paper, 2.10:1 -- under the 3:1 non-text floor, as it was under stock
+# (2.20 dark, 1.88 light); the 1px primary focus border measured above is
+# the focus cue that does clear it on the text areas and selectboxes. On
+# the primary button itself there is no such cue: :focus-visible paints the
+# same darkened fill as hover, and the ring is the primary at 50% over that
+# fill -- 1.51:1 -- so keyboard focus on Translate shows only as the fill
+# sinking (SC 2.4.11 not met there). That is Streamlit's primary-button
+# styling under any theme, stock included, not a cost of this accent.
+# The admissible band is narrow, because
+# the button label and the focus border pull L(primary) in opposite
+# directions: +-1 per RGB channel keeps them at >= 4.54 and >= 3.01, +2 on
+# every channel drops the label to 4.48, -2 drops the border to 2.97.
+# Re-run the helper before changing a digit of primaryColor,
+# backgroundColor or secondaryBackgroundColor; the two floors are guarded
+# by test_primary_button_label_readable_in_both_modes (>= 4.5) and
+# test_primary_focus_border_clears_non_text_floor (>= 3.0), and the tab
+# pair by test_active_tab_label_does_not_regress (>= 3.5, a guard, not AA).
+#
+# LINKS -- linkColor is the accent's text weight in dark mode, not the
+# primary itself: #5bae9b (hsl 166/34/52) is 6.98:1 on the page and 5.33:1
+# on a panel, where the button-side primary would be 3.99 and 3.05 and fail
+# test_link_text_readable_in_both_modes outright. Light keeps
+# linkColor == primaryColor (5.33:1 on paper, 4.63:1 on a panel). The app
+# paints no links today; the key exists to keep a future one on-palette.
+#
+# STATUS BOXES -- three of Streamlit's alert families are painted here, and
+# the attribution matters because the bundle does not do what the option
+# names suggest: st.warning paints yellowTextColor on yellowBackgroundColor
+# (ErrorElement.CZxpg0mG.js maps WARNING -> yellow, not orange), st.error
+# red, st.info blue. Orange is painted by nothing in this app, so no orange
+# key is set and none should be "fixed" later. st.info is persistent (the
+# OCR notice on the Document tab), so it is designed rather than
+# inherited: stock's #3d9df3 on a 20% blue tint over this warm page
+# measures 4.77:1, a hair over AA and the most saturated thing on the tab.
+# Slate replaces it -- #a4c2e2 on #2b3138 (7.12:1, box 1.40:1 vs page)
+# dark, #2b547f on #e3e8ec (6.36:1, box 1.13 vs paper) light -- a cool
+# note on a warm page, not the accent. Light mode also restates st.warning
+# and st.error, because stock's alert text was tuned for #ffffff and on
+# paper both drop under AA: yellow115 #926c05 on the derived tint composites
+# to 4.40:1, and the tint itself to #f9f6d9, 1.00:1 against the paper -- a
+# box you could not see; red90 #bd4043 drops to 4.23:1. Now #7a5904 on
+# #f2e7bf (5.20:1, box 1.14 vs paper) and #a33636 on #f9e1db (5.36:1, box
+# 1.15). The red box is the value Streamlit would derive anyway (red80 at
+# 10% over this paper), stated so it can be read off the file. Dark red
+# and yellow are left at stock, measured over this page: #ff6c6c on
+# #452624 4.89:1 (box 1.36 vs page), #ffffc2 on #454312 9.85:1 (1.81). The
+# error margin is 0.39; if it ever needs more, red50 #ff8c8c -- one stop up
+# Streamlit's own scale -- measures 6.03 on the same box. The bare
+# redColor/yellowColor/blueColor keys are untouched; nothing in the app
+# paints them (they feed :red[] markdown, metrics and badges).
+#
+# TYPE -- two keys, both fonts bundled in the Streamlit wheel
+# (static/media/SourceSerifVariable-Roman.*.woff2, SourceSansVF-Upright.*.woff2),
+# zero network. The caption under the title ("nothing is sent to a server")
+# makes that a hard rule: a Google Fonts URL fires on every page load. The
+# bundle maps the generic names itself -- "serif" resolves to Source Serif,
+# "sans-serif" to Source Sans -- so no fontFaces block is needed.
+# headingFont = "serif" sets the title -- the page's only heading, and the
+# only thing on it that can carry an identity, since there is no logo -- in
+# Source Serif, Source Sans's sibling family. It touches nothing else: tabs,
+# labels, captions and the panels stay Source Sans and fall back to the
+# system's CJK/Thai/Arabic faces exactly as before. It is the largest asset
+# the theme adds: the Roman woff2 is 429 KB, served by the local Streamlit
+# server on the first load (Source Sans Upright is 170 KB, for scale).
+# codeFont = "sans-serif" is the typographic half of the codeBackgroundColor
+# pin below, and the one-line reason is that a translation is prose, not
+# code. The output panel is st.code only because that element can be
+# replaced mid-stream and copied; its monospace was a side effect. The
+# input text_area beside it is Source Sans at fontSizes.sm = 0.875rem, and
+# the code block's inner <code> is codeFontSize = 0.875rem, so the two
+# panels ALREADY match at 14px and this one key makes translated prose
+# read in the same face and size as the prose it came from. codeFontSize is
+# deliberately NOT set: any value larger than the default makes the output
+# bigger than the input. It also serves the scripts: Source Code VF is a
+# 90 KB Latin, Greek and Cyrillic file, so CJK, Thai, Arabic and Amharic
+# output already fell back to the system font inside a monospace block,
+# where the metric mismatch shows most. Line heights and padding still
+# differ (1.4 and 12px in the input, 1.6 and 16px in the code block) and no
+# theme key reaches either, so the first lines of the two panels do not sit
+# on one baseline; that is geometry, not a theme bug. The key also reaches
+# the two boxes Streamlit paints in codeFont itself -- an uncaught
+# traceback and a markdown render error -- which would lose their
+# monospace; accepted, because the app catches its own exceptions.
+# Everything else -- radii, weights, link underline, borderColor,
+# showWidgetBorder, baseFontSize -- stays at Streamlit's default (0.5rem
+# radius, 16px base, underlined links, no outlines).
+#
+# codeBackgroundColor is pinned to secondaryBackgroundColor in both modes,
+# and the reason is SPATIAL, not temporal. It used to be temporal: the Text
+# tab streamed into st.code and then swapped in a settled, disabled
+# text_area, so the panel changed shade the instant a translation finished.
+# That swap is gone -- settled output renders through st.code too -- so do
+# not go looking for it.
 #
 # What survives is stronger. The Text tab's input text_area (painted with
 # secondaryBackgroundColor) and its output st.code (painted with
 # codeBackgroundColor) sit side by side in one row. Left unset,
 # codeBackgroundColor falls back to Streamlit's bgMix -- a 50/50 blend of the
-# two backgrounds (#1a1c24 dark, #f8f9fb light) -- which would make two adjacent
-# panels of a single workspace two different shades, permanently and across a
-# 16px gutter. Pinning them together is what makes the pair read as one surface.
+# two backgrounds (#23201d dark, #f2ede5 light on this palette; the bundle's
+# toFixed() rounds the .5 ties up, where Python's round() lands one step low)
+# -- which would make two adjacent panels of a single workspace two different
+# shades (1.15:1 apart in dark), permanently and across a 16px gutter. Pinning them
+# together is what makes the pair read as one surface.
+#
+# SCREENSHOT -- the dark page is warm, and assets/screenshot.png will read
+# brown-tinted when embedded on GitHub's cool #0d1117 README ground. That
+# is the palette, not a colour-management fault. The profile-conditional
+# sRGB conversion the Screenshots section documents still applies (the
+# 2026-09-11 capture carried no embedded profile and needed none), and its
+# byte-exact checks are now #161412 (page), #2f2b27 (both panels) and
+# #33826f (the Translate fill, zero clip residue).
+
+[theme]
+headingFont = "serif"
+codeFont = "sans-serif"
 
 [theme.light]
-primaryColor = "#ff4b4b"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#31333f"
-linkColor = "#0054a3"
-codeBackgroundColor = "#f0f2f6"
+primaryColor = "#287160"
+backgroundColor = "#f8f5ef"
+secondaryBackgroundColor = "#ebe5da"
+textColor = "#0e0d0b"
+linkColor = "#287160"
+codeBackgroundColor = "#ebe5da"
+blueTextColor = "#2b547f"
+blueBackgroundColor = "#e3e8ec"
+yellowTextColor = "#7a5904"
+yellowBackgroundColor = "#f2e7bf"
+redTextColor = "#a33636"
+redBackgroundColor = "#f9e1db"
 
 [theme.dark]
-primaryColor = "#ff4b4b"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
-linkColor = "#3d9df3"
-codeBackgroundColor = "#262730"
+primaryColor = "#33826f"
+backgroundColor = "#161412"
+secondaryBackgroundColor = "#2f2b27"
+textColor = "#e8e2d6"
+linkColor = "#5bae9b"
+codeBackgroundColor = "#2f2b27"
+blueTextColor = "#a4c2e2"
+blueBackgroundColor = "#2b3138"

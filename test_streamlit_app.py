@@ -135,31 +135,117 @@ def _contrast_ratio(hex_a: str, hex_b: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def test_primary_button_contrast_does_not_regress() -> None:
+def _composite(fg: str, bg: str, alpha: float) -> str:
+    # Streamlit derives several text tokens by painting textColor at a fixed
+    # alpha over a background (caption 0.6, fadedText60/40); this is the colour
+    # the browser actually shows for them.
+    channels = (
+        round(alpha * int(fg[i : i + 2], 16) + (1 - alpha) * int(bg[i : i + 2], 16))
+        for i in (1, 3, 5)
+    )
+    return "#" + "".join(f"{c:02x}" for c in channels)
+
+
+def test_primary_button_label_readable_in_both_modes() -> None:
     # Streamlit renders primary-button labels white, so this measures label
-    # against button fill — text contrast, WCAG AA 4.5:1 (SC 1.4.3). The theme
-    # uses Streamlit's stock brand red #ff4b4b, which is 3.30:1, so the app
-    # knowingly fails that: adopting the default theme was chosen over keeping
-    # a palette we controlled. Do not read the 3:1 floor below as a standard
-    # being met — nothing here satisfies AA. It is a regression guard, holding
-    # the line against a washed-out accent like the old dark-mode #88c0d0
-    # (2.00:1) while the current value sits at 3.30:1.
+    # against button fill — normal-text contrast, WCAG AA 4.5:1 (SC 1.4.3).
+    # The floor was 3.0 while the theme was Streamlit's stock red (3.30:1); the
+    # accent now clears AA (5.80 light / 4.60 dark), and the dark margin is
+    # deliberate and narrow — +2 on every RGB channel of the dark primary drops
+    # it to 4.48, because the same colour has to stay >= 3:1 as the focus
+    # border on the panel (the test below). Re-run the helper before touching
+    # either value; config.toml's ACCENT comment carries the numbers.
     theme = _load_theme_config()["theme"]
     for mode in ("light", "dark"):
         primary = theme[mode]["primaryColor"]
         ratio = _contrast_ratio("#ffffff", primary)
-        assert ratio >= 3.0, f"{mode} primaryColor {primary} contrast {ratio:.2f}"
+        assert ratio >= 4.5, f"{mode} primaryColor {primary} contrast {ratio:.2f}"
+
+
+def test_primary_focus_border_clears_non_text_floor() -> None:
+    # The accent is also the 1px focus border on the text areas and
+    # selectboxes, painted against secondaryBackgroundColor, so it must clear
+    # WCAG's 3:1 non-text floor (SC 1.4.11). Dark is 3.05 — the other side of
+    # the knife-edge the label test describes: -2 per channel drops it to 2.97.
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        primary = theme[mode]["primaryColor"]
+        panel = theme[mode]["secondaryBackgroundColor"]
+        ratio = _contrast_ratio(primary, panel)
+        assert ratio >= 3.0, (
+            f"{mode} primaryColor {primary} on {panel} contrast {ratio:.2f}"
+        )
+
+
+def test_active_tab_label_does_not_regress() -> None:
+    # Streamlit paints the selected tab's label in primaryColor as 14px text on
+    # backgroundColor. No single primary can pass 4.5:1 both as that label and
+    # under a white button label on any ordinary dark page, and the theme takes
+    # the button side, so dark is the theme's one knowing AA text failure
+    # (3.99:1; light passes at 5.33). The 3.5 floor is a regression guard, not
+    # a standard being met — it holds the line against an accent that fades
+    # into the page while the tab's 2px indicator still clears 3:1.
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        primary = theme[mode]["primaryColor"]
+        bg = theme[mode]["backgroundColor"]
+        ratio = _contrast_ratio(primary, bg)
+        assert ratio >= 3.5, (
+            f"{mode} primaryColor {primary} on {bg} contrast {ratio:.2f}"
+        )
 
 
 def test_link_text_readable_in_both_modes() -> None:
     # linkColor is body-size text on the page background, so it must clear WCAG
-    # AA for normal text (4.5:1) in both modes.
+    # AA for normal text (4.5:1) in both modes. Dark linkColor is deliberately
+    # not the primary: the button-side accent would sit at 3.99 here.
     theme = _load_theme_config()["theme"]
     for mode in ("light", "dark"):
         link = theme[mode]["linkColor"]
         bg = theme[mode]["backgroundColor"]
         ratio = _contrast_ratio(link, bg)
         assert ratio >= 4.5, f"{mode} linkColor {link} on {bg} contrast {ratio:.2f}"
+
+
+def test_caption_readable_in_both_modes() -> None:
+    # st.caption paints textColor at opacity 0.6 over the page (it never reads
+    # grayTextColor), so the subtitle and the Document tab's provenance line are
+    # this composite. Stock light sat at 3.69:1 — a documented, accepted gap;
+    # the ink is now chosen so both modes clear AA (4.96 light / 5.78 dark).
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        text, bg = theme[mode]["textColor"], theme[mode]["backgroundColor"]
+        caption = _composite(text, bg, 0.6)
+        ratio = _contrast_ratio(caption, bg)
+        assert ratio >= 4.5, f"{mode} caption {caption} on {bg} contrast {ratio:.2f}"
+
+
+def test_code_background_matches_secondary_background() -> None:
+    # The Text tab's input text_area (secondaryBackgroundColor) and output
+    # st.code (codeBackgroundColor) sit side by side in one row; unpinned,
+    # codeBackgroundColor falls back to a 50/50 blend of the two backgrounds
+    # and the pair reads as two different panels. config.toml explains it; this
+    # is the guard.
+    theme = _load_theme_config()["theme"]
+    for mode in ("light", "dark"):
+        assert (
+            theme[mode]["codeBackgroundColor"]
+            == theme[mode]["secondaryBackgroundColor"]
+        ), mode
+
+
+def test_theme_fonts_are_bundled_not_fetched() -> None:
+    # The caption under the title promises nothing is sent to a server. A
+    # Google Fonts URL in font/headingFont/codeFont fires on every page load,
+    # and [[theme.fontFaces]] would need files this repo does not ship; the
+    # generic names resolve to the Source Sans/Serif/Code files inside the
+    # Streamlit wheel.
+    theme = _load_theme_config()["theme"]
+    assert "fontFaces" not in theme
+    for section in (theme, theme["light"], theme["dark"]):
+        for key, value in section.items():
+            if key.lower().endswith("font"):
+                assert "://" not in value, f"{key} fetches a font: {value}"
 
 
 # -- LANGUAGES -----------------------------------------------------------------
