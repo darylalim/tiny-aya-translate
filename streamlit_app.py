@@ -849,7 +849,11 @@ def ensure_model(warning_container: Any) -> tuple[Any, Any] | None:
     The spinner is rendered into ``warning_container`` rather than at the script
     cursor. Inside a translate handler that cursor sits below the panels and the
     controls row, so a bare ``st.spinner`` put the only sign of activity below
-    the fold while the error landed at the top of the tab.
+    the fold while the error landed at the top of the tab. Both callers hand it
+    an ``st.empty()``, not an ``st.container()``: the spinner is transient, and
+    the clear message it always sends left a container with a phantom child that
+    held a 16px gap for the rest of the run -- see ``warning_slot`` on the Text
+    tab for the mechanism.
 
     Returns ``None`` when the load fails, having already written the error into
     that same slot. There is no cheap way to know the model loads without
@@ -1037,7 +1041,22 @@ with text_tab:
 
     # -- Warning slot (above panels) ------------------------------------------
 
-    warning_slot = st.container()
+    # st.empty(), not st.container(), because ensure_model's spinner lands here.
+    # Since Streamlit 1.53 st.spinner is a *transient* element: it arms a 0.5 s
+    # timer for the create message and sends the clear message unconditionally
+    # on exit. A warm @st.cache_resource load returns in microseconds, so the
+    # spinner never paints -- but the clear still arrives, addressed to this
+    # slot's child 0, and the frontend appends it to a container as a childless
+    # node. One child is enough to stop the block counting as empty, so a
+    # container that is otherwise not rendered at all was painted as a 0px flex
+    # item, and the tab column's 16px gap wrapped it: measured, both panels sat
+    # 16px lower from 178 ms after the click until the closing st.rerun()
+    # rebuilt the tree. An empty element already occupies child 0, so the
+    # transient anchors onto it instead, and its container is display:none --
+    # no phantom, warm or cold; a spinner that does paint still clears cleanly.
+    # Holding one element costs nothing: every writer below is in an if/elif
+    # chain, and the notice drain fires on the run *after* the one that set it.
+    warning_slot = st.empty()
     # Drain any notice left by the previous run's translate block. Read once
     # and cleared, so it survives exactly the one rerun it was raised for.
     if st.session_state.translate_notice:
@@ -1375,7 +1394,14 @@ with doc_tab:
     # output for the same reason ensure_model's spinner is: once the first
     # chunk lands, the output panel is PANEL_HEIGHT tall, so anything created
     # at the script cursor below it spends the whole run off the fold.
-    doc_status_slot = st.container()
+    # st.empty() for the reason the Text tab's warning_slot is: two instant
+    # spinners land here on a warm cache (the model load and "Reading
+    # document..."), and in a container their clear messages left a phantom
+    # child holding a 16px gap above the output on every exit that writes
+    # nothing else here -- a read failure and the blank guard -- with no
+    # st.rerun() on this tab to ever remove it. The status block, and
+    # ensure_model's error, replace the element in turn, one per run.
+    doc_status_slot = st.empty()
     doc_meta_slot = st.empty()
     doc_output_placeholder = st.empty()
     if st.session_state.doc_output:
