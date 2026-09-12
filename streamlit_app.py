@@ -348,8 +348,8 @@ def load_document_markdown(file_bytes: bytes, source_lang: str = "English") -> s
     # empty '```text```' fence for every image type in DOCUMENT_TYPES. A PDF
     # does carry a text layer, and LiteParse's auto mode would still reach for
     # OCR on sparse pages, which downloads ~15 MB of Tesseract training data
-    # from GitHub on first use. This app's whole premise is that nothing leaves
-    # the machine, so PDFs -- the common case -- stay strictly offline.
+    # from GitHub on first use. The README promises PDFs never touch the
+    # network, so PDFs -- the common case -- stay strictly offline.
     # ocr_failure_fatal is left at LiteParse's default (True). Only images run
     # OCR here, and an image has no text layer to fall back to, so False could
     # only turn "could not fetch eng.traineddata" into an empty fence that the
