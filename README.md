@@ -20,7 +20,7 @@ Translate text across **67 languages** entirely on your Mac. Tiny Aya Translate 
 - Side-by-side translation with streaming output
 - Swap and download controls
 - Its own "Reading Room" theme — a warm ink-and-paper palette designed dark-first, with a light companion; it follows your system appearance and can be switched from the app's settings menu
-- Up to 30,000 characters per input (and at most 8K tokens, which non-Latin scripts reach first) and 8K tokens per output
+- Up to 30,000 characters and 8K tokens per input (whichever your text reaches first — the token count includes the translation instruction), and up to 8K tokens per output
 - 8-bit quantized MLX inference on Apple Silicon
 
 ## Prerequisites

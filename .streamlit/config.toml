@@ -90,15 +90,16 @@
 # as the accent. Its job is rubrication -- the focus border on the text
 # areas and selectboxes, the focus ring, the one filled button, and (until
 # 2026-09-13) the active tab label and its 2px indicator. Two things
-# painted in it are TEXT under WCAG SC 1.4.3: Streamlit paints the primary
-# button's label white (fixed, not themeable),
-# and paints the active tab label in primaryColor as 14px/400 text on
+# painted in it were TEXT under WCAG SC 1.4.3 when the palette was
+# designed, and one still is: Streamlit paints the primary button's label
+# white (fixed, not themeable), and -- while the tab strip existed --
+# painted the active tab label in primaryColor as 14px/400 text on
 # backgroundColor. White-on-primary >= 4.5 needs L(primary) <= 0.1833;
 # primary-on-page >= 4.5 on #161412 needs L >= 0.2072. Both cannot hold on
 # any ordinary dark ground (the best a single colour can do for both on
 # this page is 4.29), so a side is picked, and BOTH numbers are stated:
 #   dark   white on #33826f   (Translate label, 14px/400)   4.60:1  passes
-#   dark   #33826f on #161412 (active tab label, 14px/400)  3.99:1  FAILS AA
+#   dark   #33826f on #161412 (tab label, gone 2026-09-13)  3.99:1  FAILED AA
 #   dark   #33826f on #2f2b27 (1px focus border, SC 1.4.11) 3.05:1  passes
 #   dark   hover = darken 15% = #1d493f, white on it        10.11:1 passes
 #   light  white on #287160                                  5.80:1  passes
@@ -107,7 +108,7 @@
 #   light  hover = #143930, white on it                     12.67:1 passes
 # The BUTTON side wins in dark mode. Its label is the only text on that
 # surface and the only thing that says what the click does; the active tab
-# is named three times over -- by its indicator (3.99:1 clears the 3:1
+# was named three times over -- by its indicator (3.99:1 cleared the 3:1
 # non-text floor), by its position, and by the content already showing
 # under it -- and in light mode both pairs want a dark accent, so both pass
 # and stock's two knowing failures at 3.30 are gone. It is also the side
@@ -122,9 +123,10 @@
 # exchange for a legible primary action. The balance point,
 # #3a8876, is 4.23 / 4.34 / 3.32: both pairs within 0.3 of AA, neither
 # passing, and no test restorable; rejected for that reason.
-# What the button side costs, measured: the selected tab is dimmer than
-# the inactive tabs (3.99 vs 14.24) and carries it on chroma and the
-# indicator; the hover fill #1d493f sits at 1.82:1 against the dark page
+# What the button side cost while the tab strip existed, measured: the
+# selected tab was dimmer than the inactive tabs (3.99 vs 14.24) and
+# carried it on chroma and the indicator. What it still costs: the hover
+# fill #1d493f sits at 1.82:1 against the dark page
 # (stock's #ff0000 held 4.73, the earlier draft 2.67), so a hovered
 # Translate reads pressed-in rather than lit -- transient, and the label at
 # 10.11 carries it, but move the pointer off the button before a
