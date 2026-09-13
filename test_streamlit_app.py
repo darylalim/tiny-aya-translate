@@ -37,6 +37,8 @@ from streamlit_app import (
     translate_document,
 )
 
+_APP_SOURCE = (Path(__file__).parent / "streamlit_app.py").read_text(encoding="utf-8")
+
 # -- module configuration ------------------------------------------------------
 
 
@@ -45,23 +47,30 @@ def test_transformers_verbosity_is_set() -> None:
     assert os.environ.get("TRANSFORMERS_VERBOSITY")
 
 
-def test_hub_requests_are_anonymous_and_untracked() -> None:
+def test_hub_defaults_are_set_before_anything_can_import_the_hub() -> None:
     # mlx_lm.load resolves MODEL_ID's `main` with a GET to huggingface.co on
-    # every server process's first Translate; these keep a cached `hf auth
-    # login` token and the agent-harness telemetry out of it. huggingface_hub
-    # reads both at import, so the check goes through its constants rather
-    # than os.environ: a hub import that beat the setdefault would pass an
-    # environ check and still send the token. A shell that exports either as
-    # a false value fails this on purpose.
-    from huggingface_hub import constants
-
-    assert constants.HF_HUB_DISABLE_IMPLICIT_TOKEN is True
-    assert constants.HF_HUB_DISABLE_TELEMETRY is True
+    # every server process's first Translate; these two defaults keep a cached
+    # `hf auth login` token and the agent-harness telemetry out of it.
+    # huggingface_hub reads both once, at import, so the check is static: each
+    # line is pinned verbatim, sits above `import streamlit` (the first import
+    # that could conceivably pull the hub in), and no module-level import of
+    # mlx_lm, transformers or huggingface_hub exists anywhere -- every such
+    # import is deferred into a function body. Deliberately not asserted
+    # through os.environ or huggingface_hub.constants: a shell that exports
+    # either flag would hide the lines' removal, and the constants freeze at
+    # whatever pytest's collection order happened to import first.
+    streamlit_import = _APP_SOURCE.index("import streamlit as st")
+    for flag in ("HF_HUB_DISABLE_IMPLICIT_TOKEN", "HF_HUB_DISABLE_TELEMETRY"):
+        line = f'os.environ.setdefault("{flag}", "1")'
+        assert _APP_SOURCE.count(line) == 1, flag
+        assert _APP_SOURCE.index(line) < streamlit_import, flag
+    hub_pulling = re.compile(
+        r"^(?:from|import) (?:mlx_lm|transformers|huggingface_hub)\b", re.M
+    )
+    assert not hub_pulling.search(_APP_SOURCE)
 
 
 # -- streamlit_app.py width API ------------------------------------------------
-
-_APP_SOURCE = (Path(__file__).parent / "streamlit_app.py").read_text(encoding="utf-8")
 
 
 def test_no_deprecated_use_container_width() -> None:

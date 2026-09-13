@@ -43,10 +43,9 @@
 # for symmetry, and it left that placeholder at 4.43:1; #0e0d0b lifts it to
 # #66635e, 4.77:1, and the caption to #6c6a66, 4.96:1, so both clear AA in
 # both modes (dark: caption #949088 5.78:1, placeholder #9e9990 4.96:1).
-# textColor and backgroundColor are the only
-# keys that reach any of them; an earlier CLAUDE.md's "nothing in config.toml
-# can reach it" was true of a colour directive, not of the ink the text is
-# derived from.
+# textColor and backgroundColor are the only keys that reach any of them; an
+# earlier CLAUDE.md's "nothing in config.toml can reach it" was true of a
+# colour directive, not of the ink the text is derived from.
 #
 # PANEL SEPARATION -- showWidgetBorder stays at its default (false), so the
 # text_area and st.code panels are separated from the page by fill alone.

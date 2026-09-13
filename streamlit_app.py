@@ -13,12 +13,16 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 # -- the same flag is checked before get_token(), so it also skips the OAuth
 # refresh POST that call can make. Telemetry off drops the daily
 # /api/agent-harnesses fetch and the `agent/<harness>` User-Agent segment.
-# Neither stops the GET itself; only a pinned commit `revision=` does that
-# without also breaking the cold download (HF_HUB_OFFLINE=1 stops both).
-# setdefault leaves a shell override in force, which is also the escape hatch
-# if MODEL_ID is ever swapped for a gated model: export
-# HF_HUB_DISABLE_IMPLICIT_TOKEN=0. HF_TOKEN alone is ignored -- the flag is
-# checked before get_token(), the only reader of HF_TOKEN.
+# Neither stops the GET itself. Two routes would, both keeping the cold
+# download: a pinned commit `revision=`, or a cache-first load
+# (snapshot_download with local_files_only=True, falling back to the download
+# on a miss). Both also stop the model following upstream pushes to `main`,
+# which is a product decision, not taken here. HF_HUB_OFFLINE=1 stops the GET
+# and the cold download both. setdefault leaves a shell override in force,
+# which is also the escape hatch if MODEL_ID is ever swapped for a gated
+# model: export HF_HUB_DISABLE_IMPLICIT_TOKEN=0 in the launching shell, which
+# then sends the cached token again (HF_TOKEN alone is ignored -- the flag is
+# checked before get_token(), the only reader of HF_TOKEN).
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
