@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+import ast
 import os
 import re
 import tomllib
@@ -572,6 +573,28 @@ def test_spinner_slots_are_empty_elements_not_containers() -> None:
     for name in receivers:
         callees = re.findall(rf"^\s*{name}\s*=\s*(\w+\.\w+)\(\s*\)", src, re.M)
         assert len(callees) == 1 and callees[0].endswith(".empty"), (name, callees)
+
+
+# -- in-place rerun ------------------------------------------------------------
+
+
+def test_translate_block_is_the_last_top_level_statement() -> None:
+    # Both exits of the translate block call st.rerun() in place, which is
+    # safe only because nothing after the block registers a keyed widget: a
+    # RerunException aborts the run where it is raised, Streamlit's
+    # stale-widget purge then drops every keyed widget that did not get
+    # registered, and the setdefault block re-seeds it silently on the next
+    # run. That is exactly what happened to the Document tab's pickers while
+    # `with doc_tab:` ran after this block, and why a deferred _rerun_pending
+    # flag existed until 2026-09-13. The UI test that caught it went with the
+    # tab, so the precondition is pinned here instead: the
+    # `if st.session_state._do_translate:` block must be the module's last
+    # statement. Parsed rather than grepped, so a trailing comment or a
+    # re-wrapped condition cannot fail it and a widget appended below it
+    # cannot pass.
+    last = ast.parse(_APP_SOURCE).body[-1]
+    assert isinstance(last, ast.If), ast.dump(last)[:120]
+    assert ast.unparse(last.test) == "st.session_state._do_translate"
 
 
 # -- render_output -------------------------------------------------------------
