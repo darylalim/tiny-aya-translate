@@ -36,15 +36,40 @@ commit_subjects() {
 
 # grep exits 1 when a type is absent from the range, which `set -o pipefail`
 # would otherwise turn into a failed run -- hence the `|| true`.
+#
+# The scope is `[^)]+`, not `.+`. POSIX ERE matching is leftmost-longest, so
+# `.+` let the scope group swallow a `!` and everything up to a later `): `
+# inside the subject: `feat(ui)!: drop X (and Y): text only` was filed under
+# Breaking changes AND under Features as `- text only`, and a non-breaking
+# `feat(ui): foo (bar): baz` rendered as `- baz`. An unscoped `feat!:` was
+# never affected, since `\(` has to follow the type directly.
 section() {
-  body="$(commit_subjects | grep -E "^$1(\(.+\))?: " | sed -E "s/^$1(\(.+\))?: /- /" || true)"
+  body="$(commit_subjects | grep -E "^$1(\([^)]+\))?: " | sed -E "s/^$1(\([^)]+\))?: /- /" || true)"
   if [ -n "$body" ]; then
     printf '### %s\n\n%s\n\n' "$2" "$body" >>"$out"
   fi
 }
 
-# chore/test/ci/build are deliberately omitted -- the compare link below covers
-# them, and they are noise in user-facing notes.
+# A `!` before the colon marks a breaking change (conventional commits), which
+# on 0.x is what removing a feature is. Those subjects go first, under their
+# own heading, and only there: `section`'s pattern has no `!`, so a breaking
+# commit is never also filed under its type -- and before this existed a
+# `feat!:` subject matched nothing and silently vanished from the notes. Any
+# type qualifies, including the four omitted below: `build!: require Python
+# 3.14` is user-facing however it is typed, and the `!` is the signal. Only
+# the subject form is read; a `BREAKING CHANGE:` footer lives in the body,
+# which these notes never see. Needs its `|| true` for the same reason
+# `section` does.
+breaking() {
+  body="$(commit_subjects | grep -E '^[a-z]+(\([^)]+\))?!: ' | sed -E 's/^[a-z]+(\([^)]+\))?!: /- /' || true)"
+  if [ -n "$body" ]; then
+    printf '### %s\n\n%s\n\n' "Breaking changes" "$body" >>"$out"
+  fi
+}
+
+# chore/test/ci/build are deliberately omitted unless marked `!` -- the compare
+# link below covers them, and they are noise in user-facing notes.
+breaking
 section feat "Features"
 section fix "Fixes"
 section perf "Performance"
