@@ -49,8 +49,9 @@ PANEL_HEIGHT: int = 450
 # Input cap. Reaches the browser as HTML maxlength, so it truncates
 # silently -- the placeholder names it because nothing else can.
 MAX_INPUT_CHARS: int = 30000
-# Download name before anything has been translated. Each reset path uses
-# it rather than its own literal, so the three of them cannot drift.
+# Download name before anything has been translated. Every reset goes through
+# clear_translate_output and every settle through settle_translate_output, so
+# neither name can drift between the paths that write it.
 DEFAULT_DOWNLOAD_NAME: str = "translation.txt"
 SAME_LANGUAGE_WARNING: str = "Please pick two different languages."
 NO_OUTPUT_WARNING: str = (
@@ -193,6 +194,31 @@ def stream_translate(
         yield clean_model_output(accumulated)
 
 
+def settled_download_name(target_lang: str) -> str:
+    """Name a settled translation's download after its target language."""
+    return f"translation-{target_lang}.txt"
+
+
+def clip_to_input_cap(text: str, limit: int = MAX_INPUT_CHARS) -> str:
+    """Cut ``text`` the way the browser cuts a paste into the input.
+
+    HTML ``maxlength`` -- and the frontend guard that drops any edit leaving
+    the textarea over ``max_chars`` -- counts UTF-16 code units, not
+    characters: an emoji or a CJK Extension B character is two. A plain
+    ``text[:limit]`` counts characters, so an astral-heavy output slipped
+    in over the cap, and once a controlled textarea is over ``maxlength``
+    every single-key edit that leaves it there is rejected -- the text
+    reads as frozen until it is selected and replaced. Counted in units
+    here, and never split inside a character.
+    """
+    units = 0
+    for index, char in enumerate(text):
+        units += 2 if ord(char) > 0xFFFF else 1
+        if units > limit:
+            return text[:index]
+    return text
+
+
 import streamlit as st  # noqa: E402
 
 st.set_page_config(
@@ -312,18 +338,53 @@ def clear_translate_output() -> None:
     Translate is one click. ``swap_languages`` needs no hook of its own -- it
     already clears the output, and Streamlit does not fire ``on_change`` for a
     programmatic session-state write.
+
+    The one writer for an empty output, as ``settle_translate_output`` is for
+    a settled one. The translate block's two reset paths used to inline this
+    pair, so a change to what "clear" means would have left them behind.
     """
     st.session_state.translate_output = ""
     st.session_state.download_name = DEFAULT_DOWNLOAD_NAME
 
 
+def settle_translate_output(text: str) -> None:
+    """Record ``text`` as the settled translation and name its download.
+
+    The success path and the partial-failure path both settle, and each used
+    to inline the pair. Named here rather than at the button: ``target_lang``
+    keeps moving after a translation settles, so a name built at render time
+    would describe the dropdown rather than the bytes.
+    """
+    st.session_state.translate_output = text
+    st.session_state.download_name = settled_download_name(st.session_state.target_lang)
+
+
 def swap_languages() -> None:
-    """Swap source/target languages and move output into input."""
+    """Swap source/target languages and move a settled output into the input.
+
+    The move is guarded: with nothing translated yet (or a picker change
+    having already cleared the output), an unconditional move assigned ""
+    over whatever was typed -- reproduced with AppTest: type, notice the
+    pair is backwards, swap, and the input is gone with no undo. That is
+    the one moment swap is most wanted, and the tooltip promises only to
+    move the translation, so the input survives when there is none.
+
+    The moved text is cut to MAX_INPUT_CHARS. The input's ``max_chars``
+    reaches the browser as ``maxlength``, and Streamlit's deserializer clips
+    only widget and default values, so a programmatic session-state write
+    went in whole: a settled output over the cap (a translation often runs
+    longer than its source) landed in the input at full length, against the
+    placeholder and the README. Cut here the way the browser cuts a paste --
+    silently, and in the browser's units (see ``clip_to_input_cap``).
+    """
     st.session_state.source_lang, st.session_state.target_lang = (
         st.session_state.target_lang,
         st.session_state.source_lang,
     )
-    st.session_state.translate_input = st.session_state.translate_output
+    if st.session_state.translate_output:
+        st.session_state.translate_input = clip_to_input_cap(
+            st.session_state.translate_output
+        )
     # Delegate rather than repeat: whatever "clear the settled translation"
     # comes to mean must mean the same thing on both paths.
     clear_translate_output()
@@ -550,22 +611,14 @@ if st.session_state._do_translate:
                 for partial in stream_translate(prompt_ids, model, tokenizer):
                     render_output(output_placeholder, partial)
                 if partial.strip():
-                    st.session_state.translate_output = partial
-                    # Named here rather than at the button: target_lang
-                    # keeps moving after a translation settles, so a name
-                    # built at render time would describe the dropdown
-                    # instead of the bytes.
-                    st.session_state.download_name = (
-                        f"translation-{st.session_state.target_lang}.txt"
-                    )
+                    settle_translate_output(partial)
                 else:
                     # State must agree with the message. Restoring the
                     # previous translation here -- which an earlier version
                     # did, to clear the skeleton -- put a downloadable
                     # translation of *different* input directly under
                     # "the model returned an empty translation".
-                    st.session_state.translate_output = ""
-                    st.session_state.download_name = DEFAULT_DOWNLOAD_NAME
+                    clear_translate_output()
                     st.session_state.translate_notice = (
                         "warning",
                         NO_OUTPUT_WARNING,
@@ -584,10 +637,7 @@ if st.session_state._do_translate:
             # it raised before the first token or before the stream even
             # started.
             if partial.strip():
-                st.session_state.translate_output = partial
-                st.session_state.download_name = (
-                    f"translation-{st.session_state.target_lang}.txt"
-                )
+                settle_translate_output(partial)
                 st.session_state.translate_notice = (
                     "error",
                     f"Translation failed after partial output: {e}",
@@ -598,8 +648,7 @@ if st.session_state._do_translate:
                 # previous translation up put a downloadable translation of
                 # *different* input under a failure notice, the same defect
                 # the empty branch above was rewritten to remove.
-                st.session_state.translate_output = ""
-                st.session_state.download_name = DEFAULT_DOWNLOAD_NAME
+                clear_translate_output()
                 st.session_state.translate_notice = (
                     "error",
                     f"Translation failed: {e}",

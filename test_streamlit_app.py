@@ -14,7 +14,9 @@ from streamlit_app import (
     LANGUAGES,
     build_translation_prompt,
     clean_model_output,
+    clip_to_input_cap,
     render_output,
+    settled_download_name,
     stream_translate,
     tokenize_prompt,
 )
@@ -631,8 +633,48 @@ def test_text_download_button_uses_the_recorded_name() -> None:
     # a media-manager url), so guard the wiring here: the button must read the
     # captured name, never re-inline the old constant.
     assert "file_name=st.session_state.download_name," in _APP_SOURCE
-    # The default name is written exactly once, at its constant. Three reset
-    # paths used to inline "translation.txt", so changing one left the others
-    # behind with nothing failing.
+    # Each name is written exactly once: the default at its constant, the
+    # settled form in settled_download_name. Three reset paths used to inline
+    # "translation.txt" and two settle paths the f-string, so changing one
+    # left the others behind with nothing failing.
     assert _APP_SOURCE.count('"translation.txt"') == 1
+    assert _APP_SOURCE.count("translation-") == 1
     assert "DEFAULT_DOWNLOAD_NAME" in _APP_SOURCE
+
+
+def test_settled_download_name_uses_the_target_language() -> None:
+    assert settled_download_name("French") == "translation-French.txt"
+    # Bokmål is the one LANGUAGES entry that is not ASCII; it is still a
+    # single word with no path separators, so nothing needs sanitising.
+    assert settled_download_name("Bokmål") == "translation-Bokmål.txt"
+
+
+# -- clip_to_input_cap ---------------------------------------------------------
+
+
+def _utf16_units(text: str) -> int:
+    # What the browser's maxlength and Streamlit's frontend guard count.
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_clip_to_input_cap_counts_utf16_units_like_maxlength() -> None:
+    # An astral character is two UTF-16 units, so 20,000 of them are 40,000
+    # units against a 30,000 cap: the cut lands at 15,000 characters, where
+    # text[:30_000] would have kept all 20,000 and left the input over the
+    # cap the browser enforces.
+    clipped = clip_to_input_cap("\U0001f600" * 20_000, 30_000)
+    assert len(clipped) == 15_000
+    assert _utf16_units(clipped) == 30_000
+
+
+def test_clip_to_input_cap_never_splits_a_character() -> None:
+    # With one unit of room left and an astral character next, the cut
+    # stops before it rather than emitting half of it.
+    assert clip_to_input_cap("ab\U0001f600", 3) == "ab"
+    assert clip_to_input_cap("ab\U0001f600", 4) == "ab\U0001f600"
+
+
+def test_clip_to_input_cap_leaves_text_under_the_cap_alone() -> None:
+    assert clip_to_input_cap("short", 30_000) == "short"
+    assert clip_to_input_cap("x" * 30_000, 30_000) == "x" * 30_000
+    assert clip_to_input_cap("x" * 30_001, 30_000) == "x" * 30_000

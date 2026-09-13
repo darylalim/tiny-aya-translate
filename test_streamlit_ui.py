@@ -6,6 +6,8 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+from streamlit_app import MAX_INPUT_CHARS
+
 
 @pytest.fixture(autouse=True)
 def clear_st_cache() -> None:
@@ -127,6 +129,51 @@ def test_swap_moves_output_to_input() -> None:
     assert at.text_area[0].value == "Bonjour"
     # Output should be cleared
     assert at.text_area[1].value == ""
+
+
+def test_swap_keeps_typed_input_when_nothing_is_translated(app: AppTest) -> None:
+    # The move is guarded on a settled output. Unguarded, swapping with
+    # nothing translated assigned "" over the typed text -- the one moment
+    # swap is most wanted (typed, pair backwards, not yet translated).
+    app.text_area[0].set_value("typed but untranslated")
+    app.button("swap").click()
+    _rerun_with_mocks(app)
+
+    assert app.text_area[0].value == "typed but untranslated"
+    assert app.selectbox[0].value == "French"
+    assert app.selectbox[1].value == "English"
+
+
+def test_swap_clips_a_long_output_to_the_input_cap() -> None:
+    # max_chars reaches the browser as maxlength and Streamlit's deserializer
+    # clips only widget and default values, so a programmatic session-state
+    # write went in whole: before the clip, this landed 30,500 characters in
+    # the input, against the placeholder and the README.
+    at = _run_inference_test(
+        input_text="Hello", chunk_text="x" * (MAX_INPUT_CHARS + 500)
+    )
+    at.button("swap").click()
+    _rerun_with_mocks(at)
+
+    assert at.text_area[0].value == "x" * MAX_INPUT_CHARS
+    assert at.session_state["translate_input"] == "x" * MAX_INPUT_CHARS
+
+
+def test_swap_clips_in_the_browsers_units_not_characters() -> None:
+    # maxlength counts UTF-16 code units, and an emoji is two. A character
+    # slice would keep 30,000 emoji -- 60,000 units, double the cap -- and a
+    # controlled textarea over maxlength rejects every single-key edit that
+    # leaves it there, so the input reads as frozen. Half the cap in emoji is
+    # exactly the cap in units.
+    at = _run_inference_test(
+        input_text="Hello", chunk_text="\U0001f600" * (MAX_INPUT_CHARS // 2 + 1)
+    )
+    at.button("swap").click()
+    _rerun_with_mocks(at)
+
+    moved = at.session_state["translate_input"]
+    assert moved == "\U0001f600" * (MAX_INPUT_CHARS // 2)
+    assert len(moved.encode("utf-16-le")) // 2 == MAX_INPUT_CHARS
 
 
 # -- Text panels ---------------------------------------------------------------
