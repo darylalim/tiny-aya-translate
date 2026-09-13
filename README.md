@@ -5,9 +5,9 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0%20code%20%C2%B7%20CC--BY--NC%20model-blue)](#license)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)
 
-*Private, on-device translation for Apple Silicon — 67 languages, text and documents, no API key.*
+*Private, on-device translation for Apple Silicon — 67 languages, no API key.*
 
-Translate text and whole documents across **67 languages** entirely on your Mac. Tiny Aya Translate runs [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) locally with [MLX](https://github.com/ml-explore/mlx) — nothing you translate leaves your Mac, and no API key is required.
+Translate text across **67 languages** entirely on your Mac. Tiny Aya Translate runs [Cohere Labs Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) locally with [MLX](https://github.com/ml-explore/mlx) — nothing you translate leaves your Mac, and no API key is required.
 
 > **Note:** the model weights are licensed **CC-BY-NC (non-commercial only)** — see [License](#license).
 
@@ -15,14 +15,12 @@ Translate text and whole documents across **67 languages** entirely on your Mac.
 
 ## Features
 
-- Local inference — no API key required; your text and documents stay on your machine
+- Local inference — no API key required; your text stays on your machine
 - 67 languages across Europe, West Asia, South Asia, Asia Pacific, and Africa
-- Translate text and documents — PDFs parse locally with LiteParse and never touch the network; image uploads are OCR'd in the language you pick as the source (each language downloads ~15 MB of OCR data from GitHub once)
 - Side-by-side translation with streaming output
-- Cached document parsing for fast re-translation
 - Swap and download controls
 - Its own "Reading Room" theme — a warm ink-and-paper palette designed dark-first, with a light companion; it follows your system appearance and can be switched from the app's settings menu
-- Up to 8K tokens per input and per output
+- Up to 30,000 characters per input (and at most 8K tokens, which non-Latin scripts reach first) and 8K tokens per output
 - 8-bit quantized MLX inference on Apple Silicon
 
 ## Prerequisites
@@ -47,7 +45,7 @@ uv sync
 uv run streamlit run streamlit_app.py
 ```
 
-The page loads immediately; the first **Translate** click downloads tiny-aya-global (~3.6 GB) from Hugging Face and loads it into memory, so that first translation takes a while and later ones are instant. Each later start of the app repeats one small part of that on its first Translate: an anonymous request to huggingface.co asking whether the model is still current — it carries nothing you translate and no login token — followed by a re-download only if the model has been updated upstream. PDFs need nothing more; a scanned image fetches ~15 MB of OCR data from GitHub the first time each source language is used. To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`. The app ships with its own "Reading Room" theme — a warm ink-and-paper palette designed dark-first, with a light companion; it follows your system appearance and can be switched via the app's settings menu. Both palettes, and the reasoning behind every value, live in `.streamlit/config.toml`; edit that file to restyle it.
+The page loads immediately; the first **Translate** click downloads tiny-aya-global (~3.6 GB) from Hugging Face and loads it into memory, so that first translation takes a while and later ones are instant. Each later start of the app repeats one small part of that on its first Translate: an anonymous request to huggingface.co asking whether the model is still current — it carries nothing you translate and no login token — followed by a re-download only if the model has been updated upstream. To tune the model or sampling parameters, edit the constants at the top of `streamlit_app.py`. The app ships with its own "Reading Room" theme — a warm ink-and-paper palette designed dark-first, with a light companion; it follows your system appearance and can be switched via the app's settings menu. Both palettes, and the reasoning behind every value, live in `.streamlit/config.toml`; edit that file to restyle it.
 
 ## Development
 
