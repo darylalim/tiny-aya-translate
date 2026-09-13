@@ -45,7 +45,32 @@ MAX_INPUT_TOKENS: int = 8192
 
 # Shared UI constants. PANEL_HEIGHT sizes the input panel, the empty-state
 # output panel, the skeleton and render_output alike.
-PANEL_HEIGHT: int = 450
+#
+# 438 is a budget, not a taste. It is the tallest panel at which the resting
+# page fits the 1920x839 viewport the main display actually gives (a 1080
+# display with the Dock showing, Chrome at its 960px maximum) with nothing
+# to scroll -- one pixel over and macOS with a mouse attached paints a
+# classic 11px scrollbar that takes layout width. Measured 2026-09-13 with
+# getBoundingClientRect under Streamlit 1.63.0, controls docked (see the
+# controls row): 96 top padding + 72.8 title container + 16 + 72 language
+# row + 16 + panels + 16 main bottom padding + 112 bar = 400.8 + panels, so
+# 438.2 is the ceiling. Anything added above the bar costs its height plus a
+# 16px gap, and an alert in warning_slot spends it for as long as it shows:
+# the three pre-stream warnings and the drained empty-output/failure notice
+# each add 56 + 16, the page overflows to 911, and at scrollTop 0 the opaque
+# bar sits over the bottom ~56px of both panels -- the last input lines, the
+# resize grip, a partial translation's tail -- with no edge to show it is
+# covering anything; ensure_model's spinner costs 25.6 + 16 the same way for
+# the load's duration. Accepted: the in-flow row it replaced spent the same
+# alert pushing Translate itself below the fold, which was worse.
+# The sum is static and cannot see Streamlit's chrome move: re-read
+# section.stMain's scrollHeight against its clientHeight after any change to
+# the title, the language row, the theme's base size or the Streamlit
+# version. The input text_area keeps its vertical resize grip at a fixed
+# height (the bundle sets resize:none only for a stretched one), so more
+# input lines are a drag away, at the cost of scrolling; the st.code output
+# does not follow.
+PANEL_HEIGHT: int = 438
 # Input cap. Reaches the browser as HTML maxlength, so it truncates
 # silently -- the placeholder names it because nothing else can.
 MAX_INPUT_CHARS: int = 30000
@@ -230,10 +255,11 @@ st.set_page_config(
 
 # show_spinner=False: on a cache miss the decorator's default paints its own
 # "Running `load_model()`." spinner at the script cursor -- which, inside the
-# translate handler, is below the controls row. ensure_model already shows the
-# one indicator for the load, in the slot above the panels; reproduced on a
-# cold cache, the default painted a second spinner under the buttons for the
-# whole load, the off-the-fold position ensure_model exists to avoid.
+# translate handler, is at the foot of the main block, below the panels.
+# ensure_model already shows the one indicator for the load, in the slot
+# above the panels; reproduced on a cold cache while the controls row was
+# still in the flow, the default painted a second spinner under the buttons
+# for the whole load, the off-the-fold position ensure_model exists to avoid.
 @st.cache_resource(show_spinner=False)
 def load_model() -> tuple[Any, Any]:
     """Load model and tokenizer once per server process.
@@ -268,12 +294,13 @@ def ensure_model(slot: Any) -> tuple[Any, Any] | None:
     first translation rather than at startup.
 
     The spinner is rendered into ``slot`` rather than at the script cursor.
-    Inside the translate handler that cursor sits below the panels and the
-    controls row, so a bare ``st.spinner`` put the only sign of activity below
-    the fold while the error landed at the top of the page. ``slot`` must be an
-    ``st.empty()``, not an ``st.container()``: the spinner is transient, and the
-    clear message it always sends leaves a container with a phantom child that
-    holds a 16px gap for the rest of the run -- mechanism at ``warning_slot``.
+    Inside the translate handler that cursor sits below the panels, at the
+    foot of the main block, so a bare ``st.spinner`` put the only sign of
+    activity below the fold while the error landed at the top of the page.
+    ``slot`` must be an ``st.empty()``, not an ``st.container()``: the spinner
+    is transient, and the clear message it always sends leaves a container
+    with a phantom child that holds a 16px gap for the rest of the run --
+    mechanism at ``warning_slot``.
 
     Returns ``None`` when the load fails, having already written the error into
     that same slot. There is no cheap way to know the model loads without
@@ -522,8 +549,32 @@ with col_output:
             label_visibility="collapsed",
         )
 
-# -- Controls row -------------------------------------------------------------
+# -- Controls row (docked) ----------------------------------------------------
 
+# st.bottom, not the page flow. Streamlit pads the main block 10rem at the
+# bottom -- 160px of dead space under the buttons, and at 1920x839 the whole
+# of what made the page scroll -- and a bottom container is the one native
+# lever that drops it: with anything in st.bottom the frontend pads the main
+# block 1rem instead (1.63.0's bundle: `paddingBottom = showPadding &&
+# !hasBottom ? 10rem : 1rem`) and renders this row in a sticky, opaque,
+# page-coloured bar with 16px above and 56px below the buttons -- the bar's
+# own padding, not removable without CSS. That buys the panels 88px over the
+# in-flow fit and still lands the buttons directly under them, aligned to
+# the pixel: the bar's block container carries the same 5rem wide-mode side
+# padding as the main block. On a viewport shorter than the page (783 with
+# the extension's debugger bar, ~760 on a laptop) the bar stays put and the
+# panels scroll under it, so Translate is always reachable; on a taller one
+# (fullscreen Chrome, the 1080x1623 portrait display) a flex-grow spacer
+# pushes the bar to the viewport's bottom edge and it detaches from the
+# panels -- the sheet-and-dialog convention, where the action row pins to
+# the window edge whatever the form above it does, accepted for the display
+# the app is not designed around. Two things follow from the mechanism.
+# Both buttons must be emitted on every run: an empty bar flips the main
+# block's padding back to 160 and shifts the whole page 144px between runs.
+# And the 16/56 bar padding, the spacer and the sticky rule are read from
+# the bundle, not an API promise -- remeasure on every Streamlit bump; the
+# budget they feed is at PANEL_HEIGHT.
+#
 # st.columns, not st.container(horizontal=True): the horizontal container is
 # a flex row whose children are `flex: 1 1 fit-content`, so a stretched button
 # grows from its *intrinsic* width rather than splitting the row evenly.
@@ -533,31 +584,43 @@ with col_output:
 # (Translate 460.6px vs Download 465.4px against 461/461 panels, a 14px gap
 # against the panels' 16px), and the theme now inherits Streamlit's 16px
 # base, which moves every intrinsic width and gap. Remeasure before quoting.
-sub_translate, sub_download = st.columns(2, vertical_alignment="center", gap="small")
-with sub_translate:
-    st.button(
-        "Translate",
-        key="translate",
-        icon=":material/translate:",
-        on_click=request_translate,
-        type="primary",
-        width="stretch",
+#
+# wrap=False is the one place the controls stop mirroring the panels, and it
+# is exactly where the panels stop being side by side. Below 640px every
+# other column stacks, and a stacked pair here would make the sticky bar
+# 168px tall (16 + 40 + 16 + 40 + 56) -- a fifth of a phone viewport, held
+# for good. Side by side it stays 112. A longer label would ellipsize rather
+# than wrap, the rule a direct column child picked up in 1.63; the two here
+# fit with room to spare -- 54 and 60px labels in 231px buttons at a 520px
+# viewport (Chrome's window floor on macOS), 176px buttons at 400.
+with st.bottom:
+    sub_translate, sub_download = st.columns(
+        2, vertical_alignment="center", gap="small", wrap=False
     )
-with sub_download:
-    st.download_button(
-        "Download",
-        key="download",
-        icon=":material/download:",
-        data=st.session_state.translate_output,
-        file_name=st.session_state.download_name,
-        mime="text/plain",
-        # Downloading changes no server state, and on_click defaults to
-        # "rerun" -- which re-executes the whole script for nothing.
-        on_click="ignore",
-        disabled=not st.session_state.translate_output.strip(),
-        type="secondary",
-        width="stretch",
-    )
+    with sub_translate:
+        st.button(
+            "Translate",
+            key="translate",
+            icon=":material/translate:",
+            on_click=request_translate,
+            type="primary",
+            width="stretch",
+        )
+    with sub_download:
+        st.download_button(
+            "Download",
+            key="download",
+            icon=":material/download:",
+            data=st.session_state.translate_output,
+            file_name=st.session_state.download_name,
+            mime="text/plain",
+            # Downloading changes no server state, and on_click defaults to
+            # "rerun" -- which re-executes the whole script for nothing.
+            on_click="ignore",
+            disabled=not st.session_state.translate_output.strip(),
+            type="secondary",
+            width="stretch",
+        )
 
 # -- Process translation request (below controls) -----------------------------
 
@@ -593,9 +656,9 @@ if st.session_state._do_translate:
                 )
             else:
                 # The activity indicator belongs in the panel the result
-                # lands in. The script cursor here is below the panels AND
-                # the controls row, so a bare spinner spends the run off
-                # the fold -- the trap ensure_model already documents.
+                # lands in. The script cursor here is below the panels, at
+                # the foot of the main block, so a bare spinner spends the
+                # run off the fold -- the trap ensure_model already documents.
                 # warning_slot is above the fold but sits above the panels,
                 # so it would push the whole side-by-side row down for the
                 # duration and snap it back. A skeleton at PANEL_HEIGHT

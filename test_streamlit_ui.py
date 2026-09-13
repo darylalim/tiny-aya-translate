@@ -4,7 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import streamlit as st
+from streamlit.proto.RootContainer_pb2 import RootContainer
 from streamlit.testing.v1 import AppTest
+from streamlit.testing.v1.element_tree import Block
 
 from streamlit_app import MAX_INPUT_CHARS
 
@@ -398,6 +400,27 @@ def test_download_button_disabled_when_output_empty(app: AppTest) -> None:
 def test_download_button_enabled_when_output_present() -> None:
     at = _run_inference_test(input_text="Hello", chunk_text="Bonjour")
     assert not at.get("download_button")[0].disabled  # ty: ignore[unresolved-attribute]
+
+
+# -- Docked controls -----------------------------------------------------------
+
+
+def test_controls_row_lives_in_the_bottom_bar(app: AppTest) -> None:
+    # Translate and Download render in st.bottom, the one native lever that
+    # drops the main block's 160px bottom padding and pins the pair to the
+    # viewport at every height. AppTest has no `bottom` accessor in 1.63.0
+    # (`main` is root 0, `sidebar` root 1), so the bar is read by root index
+    # -- the element tree creates it on demand, so a page that never touches
+    # st.bottom fails on the KeyError. Pinned positively: the bar holds
+    # exactly Translate and one Download, and main holds only the swap
+    # button. Either button moved back into the flow (or into the sidebar)
+    # fails its bar line; a stray copy in main fails the main line.
+    bottom = app._tree[RootContainer.BOTTOM]
+    assert isinstance(bottom, Block)
+    assert [b.key for b in bottom.button] == ["translate"]
+    assert len(bottom.get("download_button")) == 1
+    assert [b.key for b in app.main.button] == ["swap"]
+    assert not app.main.get("download_button")
 
 
 # -- Output text area ----------------------------------------------------------

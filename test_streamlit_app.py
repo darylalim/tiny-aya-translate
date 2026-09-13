@@ -76,9 +76,62 @@ def test_buttons_use_width_stretch() -> None:
 
 
 def test_panel_height_not_hardcoded() -> None:
-    # The 450px panel height now lives in PANEL_HEIGHT; guard against re-inlining
-    # the magic number at a call site (text_area panels or render_output).
-    assert "height=450" not in _APP_SOURCE
+    # The panel height lives in PANEL_HEIGHT; guard against re-inlining a
+    # number at a call site (the text_area panels, the skeleton or
+    # render_output). A digit rather than the current value, so the guard
+    # cannot go stale when the constant is retuned -- it pinned "height=450"
+    # until the 2026-09-13 fit, which would have waved a re-inlined 438
+    # straight through. The swap button's width=40 is the app's only literal
+    # dimension, and it is a width.
+    assert not re.search(r"height=\d", _APP_SOURCE)
+
+
+def test_panel_height_fits_the_main_display_fold() -> None:
+    # The resting page is designed to fit the 1920x839 viewport the main
+    # display gives (1080 tall, the Dock showing, Chrome at 960) with nothing
+    # to scroll, because a page that scrolls on macOS with a mouse attached
+    # also grows a classic 11px scrollbar that takes layout width. Ledger
+    # measured 2026-09-13 with getBoundingClientRect, Streamlit 1.63.0, the
+    # controls docked in st.bottom: 6rem top padding, the st.title element
+    # container, the root block's two 16px gaps around the bordered language
+    # row, the main block's 1rem bottom padding (st.bottom's doing -- it is
+    # 10rem without one), and the bar itself, 1rem + the 40px buttons +
+    # 3.5rem. Static arithmetic: it fails a bump of the constant, catches a
+    # row added above the bar only if its height is added here, and cannot
+    # see Streamlit's chrome move on an upgrade -- re-measure section.stMain's
+    # scrollHeight against clientHeight then, rather than trust it. `<=`, not
+    # `==`, so deliberate slack still passes.
+    chrome = 96 + 72.8 + 16 + 72 + 16 + 16 + (16 + 40 + 56)
+    assert chrome + streamlit_app.PANEL_HEIGHT <= 839
+
+
+def test_controls_row_is_docked_and_never_stacks() -> None:
+    # The docking itself is pinned at runtime in test_streamlit_ui.py
+    # (test_controls_row_lives_in_the_bottom_bar); AppTest renders no layout,
+    # so the columns' wrap flag is pinned here. Parsed rather than counted,
+    # so the comment above the row can name wrap=False in prose. Exactly one
+    # st.bottom block anywhere in the module (walked, not just the top level,
+    # so a second bar nested in the translate block cannot hide), at the top
+    # level, holding exactly one st.columns call, and that call opts out of
+    # stacking: a stacked pair turns the sticky bar into a 168px permanent
+    # overlay below 640px.
+    tree = ast.parse(_APP_SOURCE)
+    bottoms = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.With)
+        and any(ast.unparse(item.context_expr) == "st.bottom" for item in node.items)
+    ]
+    assert len(bottoms) == 1
+    assert bottoms[0] in tree.body
+    columns = [
+        node
+        for node in ast.walk(bottoms[0])
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "st.columns"
+    ]
+    assert len(columns) == 1
+    keywords = {kw.arg: ast.unparse(kw.value) for kw in columns[0].keywords}
+    assert keywords.get("wrap") == "False", keywords
 
 
 def test_warning_strings_defined_once() -> None:
