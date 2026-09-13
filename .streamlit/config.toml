@@ -36,11 +36,12 @@
 # concrete, because three text surfaces are derived from textColor at a
 # fixed alpha and nothing else reaches them: st.caption paints textColor at
 # opacity 0.6 (never grayTextColor), which stock light left at 3.69:1 --
-# the documented, accepted AA miss on the Document tab's provenance line;
-# the enabled text_area's placeholder ("Enter text to translate ...") and
-# the uploader's size/type hint are fadedText60, the same ink at 60% over
-# the panel. An earlier draft used the dark page colour #161412 as the ink
-# for symmetry, and it left that placeholder at 4.43:1; #0e0d0b lifts it to
+# the accepted AA miss on the Document tab's provenance caption while it
+# existed; the enabled text_area's placeholder ("Enter text to translate
+# ...") is fadedText60 (so was the file uploader's size/type hint, until
+# 2026-09-13), the same ink at 60% over the panel. An earlier draft used
+# the dark page colour #161412 as the ink for symmetry, and it left that
+# placeholder at 4.43:1; #0e0d0b lifts it to
 # #66635e, 4.77:1, and the caption to #6c6a66, 4.96:1, so both clear AA in
 # both modes (dark: caption #949088 5.78:1, placeholder #9e9990 4.96:1).
 # textColor and backgroundColor are the only keys that reach any of them; an
@@ -72,9 +73,9 @@
 # 8-bit step off), #c9c7c1 light (1.55:1, stock 1.45). The enabled Download
 # fill is lightenedBg05 (HSL lighten 2.5%), #1c1a17 dark (painted #1c1917),
 # 1.06:1 vs page, so the outline is the button, exactly as under stock
-# (1.05) -- and at rest Download (and Translate document before an upload)
-# is disabled, which paints a transparent fill, the borderColor hairline
-# and a fadedText40 label (#6a6660, 3.22:1 dark; #9a9894, 2.65:1 light).
+# (1.05) -- and at rest Download is disabled, which paints a transparent
+# fill, the borderColor hairline and a fadedText40 label (#6a6660, 3.22:1
+# dark; #9a9894, 2.65:1 light).
 # The st.skeleton that fills the output panel during translation
 # and the selectbox option highlight are darkenedBgMix15: #2f2d2a over the
 # dark page, 1.34:1 (stock 1.30), #f0e9de over the paper, 1.11:1. If the
@@ -84,12 +85,13 @@
 # ACCENT -- verdigris, #33826f dark (hsl 166/44/35) and #287160 light
 # (hsl 166/48/30): one hue at two values, and not a brand red, because
 # nothing here has a brand. Hue 166 is chosen to sit far from st.info's
-# blue (~211 on this theme) and Streamlit's success green (~140), so the
-# persistent OCR notice on the Document tab can never read as the accent.
-# Its job is rubrication -- the active tab label and its 2px indicator, the
-# focus border on the text areas and selectboxes, the focus ring, and the
-# one filled button. Two things painted in it are TEXT under WCAG SC 1.4.3:
-# Streamlit paints the primary button's label white (fixed, not themeable),
+# blue (~211 on this theme) and Streamlit's success green (~140), so a
+# st.info box (the Document tab's OCR notice, while it existed) never reads
+# as the accent. Its job is rubrication -- the focus border on the text
+# areas and selectboxes, the focus ring, the one filled button, and (until
+# 2026-09-13) the active tab label and its 2px indicator. Two things
+# painted in it are TEXT under WCAG SC 1.4.3: Streamlit paints the primary
+# button's label white (fixed, not themeable),
 # and paints the active tab label in primaryColor as 14px/400 text on
 # backgroundColor. White-on-primary >= 4.5 needs L(primary) <= 0.1833;
 # primary-on-page >= 4.5 on #161412 needs L >= 0.2072. Both cannot hold on
@@ -144,7 +146,10 @@
 # backgroundColor or secondaryBackgroundColor; the two floors are guarded
 # by test_primary_button_label_readable_in_both_modes (>= 4.5) and
 # test_primary_focus_border_clears_non_text_floor (>= 3.0), and the tab
-# pair by test_active_tab_label_does_not_regress (>= 3.5, a guard, not AA).
+# pair by test_primary_on_page_does_not_regress (>= 3.5, a guard, not AA;
+# named test_active_tab_label_does_not_regress until 2026-09-13).
+# As of 2026-09-13 the app renders no tab strip, so the tab-label pair is the
+# trade-off this palette was designed under, not something painted today.
 #
 # LINKS -- linkColor is the accent's text weight in dark mode, not the
 # primary itself: #5bae9b (hsl 166/34/52) is 6.98:1 on the page and 5.33:1
@@ -153,15 +158,19 @@
 # linkColor == primaryColor (5.33:1 on paper, 4.63:1 on a panel). The app
 # paints no links today; the key exists to keep a future one on-palette.
 #
-# STATUS BOXES -- three of Streamlit's alert families are painted here, and
-# the attribution matters because the bundle does not do what the option
-# names suggest: st.warning paints yellowTextColor on yellowBackgroundColor
+# STATUS BOXES -- two of Streamlit's alert families are painted here
+# (st.warning and st.error; st.info is painted by nothing since the
+# Document tab went on 2026-09-13), and the attribution matters because
+# the bundle does not do what the option names suggest: st.warning paints
+# yellowTextColor on yellowBackgroundColor
 # (ErrorElement.CZxpg0mG.js maps WARNING -> yellow, not orange), st.error
 # red, st.info blue. Orange is painted by nothing in this app, so no orange
-# key is set and none should be "fixed" later. st.info is persistent (the
-# OCR notice on the Document tab), so it is designed rather than
-# inherited: stock's #3d9df3 on a 20% blue tint over this warm page
-# measures 4.77:1, a hair over AA and the most saturated thing on the tab.
+# key is set and none should be "fixed" later. The blue pair was designed
+# for a persistent st.info -- the Document tab's OCR notice, until
+# 2026-09-13 -- and is kept so a future st.info lands on-palette rather
+# than on stock's saturated blue: stock's #3d9df3 on a 20% blue tint over
+# this warm page measures 4.77:1, a hair over AA and the most saturated
+# thing on the page.
 # Slate replaces it -- #a4c2e2 on #2b3138 (7.12:1, box 1.40:1 vs page)
 # dark, #2b547f on #e3e8ec (6.36:1, box 1.13 vs paper) light -- a cool
 # note on a warm page, not the accent. Light mode also restates st.warning
@@ -222,7 +231,7 @@
 # That swap is gone -- settled output renders through st.code too -- so do
 # not go looking for it.
 #
-# What survives is stronger. The Text tab's input text_area (painted with
+# What survives is stronger. The page's input text_area (painted with
 # secondaryBackgroundColor) and its output st.code (painted with
 # codeBackgroundColor) sit side by side in one row. Left unset,
 # codeBackgroundColor falls back to Streamlit's bgMix -- a 50/50 blend of the
@@ -249,8 +258,8 @@
 # that the favicon no longer fetched from fonts.gstatic.com. The README's
 # privacy promise applies here too; with this off, and the favicon and
 # fonts local, a page load makes no request that leaves the machine (the
-# model and OCR data downloads announce themselves). The one server-side
-# exception is not on the documented run path: starting with
+# model download announces itself). The one server-side exception is not
+# on the documented run path: starting with
 # --server.headless true, as the screenshot recipe does, makes bootstrap
 # GET http://checkip.amazonaws.com once to print an "External URL".
 # test_usage_stats_are_off guards the setting.
