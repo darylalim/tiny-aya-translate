@@ -578,7 +578,6 @@ with col_output:
             height=PANEL_HEIGHT,
             placeholder="Translation appears here",
             disabled=True,
-            value="",
             label_visibility="collapsed",
         )
 
@@ -618,8 +617,11 @@ with col_output:
 # against the panels' 16px), and the theme now inherits Streamlit's 16px
 # base, which moves every intrinsic width and gap. Remeasure before quoting.
 #
-# wrap=False is the one place the controls stop mirroring the panels, and it
-# is exactly where the panels stop being side by side. Below 640px every
+# wrap=False is the one place the controls stop mirroring the panels -- the
+# call is otherwise the panels' own st.columns(2); a gap="small" and a
+# vertical_alignment="center" it used to carry were the default and, for two
+# equal-height buttons, a no-op, and went on 2026-09-14 -- and it is exactly
+# where the panels stop being side by side. Below 640px every
 # other column stacks, and a stacked pair here would make the sticky bar
 # 168px tall (16 + 40 + 16 + 40 + 56) -- a fifth of a phone viewport, held
 # for good. Side by side it stays 112. A longer label would ellipsize rather
@@ -627,9 +629,7 @@ with col_output:
 # fit with room to spare -- 54 and 60px labels in 231px buttons at a 520px
 # viewport (Chrome's window floor on macOS), 176px buttons at 400.
 with st.bottom:
-    sub_translate, sub_download = st.columns(
-        2, vertical_alignment="center", gap="small", wrap=False
-    )
+    sub_translate, sub_download = st.columns(2, wrap=False)
     with sub_translate:
         # The return value is the click signal: True on the run the click
         # starts, False after the block's closing st.rerun() -- a
@@ -656,12 +656,10 @@ with st.bottom:
             icon=":material/download:",
             data=st.session_state.translate_output,
             file_name=st.session_state.download_name,
-            mime="text/plain",
             # Downloading changes no server state, and on_click defaults to
             # "rerun" -- which re-executes the whole script for nothing.
             on_click="ignore",
             disabled=not st.session_state.translate_output.strip(),
-            type="secondary",
             width="stretch",
         )
 
