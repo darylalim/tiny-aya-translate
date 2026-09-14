@@ -755,6 +755,24 @@ if translate_clicked:
                 # No st.spinner alongside it: that would be a second
                 # indicator for one operation, at the very cursor position
                 # the paragraph above rules out.
+                #
+                # Accepted cost, measured 2026-09-14: the streaming text is
+                # the activity indicator only while its tail is in view.
+                # The fixed-height code block has no autoscroll, React
+                # updates its <pre> in place, and nothing moves scrollTop,
+                # so once the running text passes the panel's ~18 wrapped
+                # lines (~2,500 characters at the 1920 width, ~1,200 at
+                # 1080) new tokens land below its fold and the visible
+                # panel stops moving until the closing rerun -- scrollTop
+                # read 0 across every sample of a 4,214-character stream.
+                # st.container(autoscroll=True) does follow a content-height
+                # code block (verified), but the panel's fill is the code
+                # block's own box: a short translation would stream as a
+                # small box growing inside an invisible container and snap
+                # to the full panel at settle, and a long one would jump
+                # back to its top when done. The matched panels are the
+                # design; the tail is out of view only during a stream
+                # longer than the panel. Not taken.
                 output_placeholder.skeleton(height=PANEL_HEIGHT)
                 for partial in stream_translate(prompt_ids, model, tokenizer):
                     render_output(output_placeholder, partial)
