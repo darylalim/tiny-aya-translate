@@ -269,6 +269,25 @@
 [browser]
 gatherUsageStats = false
 
+# Both language pickers are bound to the URL (bind="query-params"), which
+# makes their defaults widget-owned (index=) rather than session-state
+# seeds: a bound value is dropped from the URL when it equals the *widget's*
+# default, and seeded widgets both defaulted to LANGUAGES[0], so a
+# French -> English pair was written as ?source_lang=French and read back
+# as French -> French. swap_languages then writes both keys from its
+# callback -- the documented route for a bound widget -- and selectbox's
+# policy check logs "created with a default value but also had its value
+# set via the Session State API" once per process for the one picker whose
+# index is not 0 (index=0 is exempted as "no default" in
+# elements/widgets/selectbox.py). The warning is for the ambiguous case
+# where a script both seeds and defaults a widget without meaning to; here
+# the callback write is the intent, so the documented mute is set. It
+# silences that one message only, for the whole app; there are two keyed
+# widgets with defaults and both are the pickers. Recorded in CLAUDE.md
+# under Page layout and controls.
+[global]
+disableWidgetStateDuplicationWarning = true
+
 [theme]
 headingFont = "serif"
 codeFont = "sans-serif"

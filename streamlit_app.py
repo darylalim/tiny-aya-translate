@@ -81,6 +81,16 @@ MAX_INPUT_CHARS: int = 30000
 # clear_translate_output and every settle through settle_translate_output, so
 # neither name can drift between the paths that write it.
 DEFAULT_DOWNLOAD_NAME: str = "translation.txt"
+# The pickers' defaults are the widgets' own (`index=`), not session-state
+# seeds, because both pickers are bound to the URL: a bound value is dropped
+# from the URL whenever it equals the *widget's* default, and read back
+# against the same default. Seeded, both widgets defaulted to LANGUAGES[0]
+# ("English"), so a French -> English pair was written as ?source_lang=French
+# alone and read back as French -> French -- the seed won over the dropped
+# param -- reproduced with AppTest before the seeds went. With index= the
+# default the URL is measured against is the pair the page opens with.
+DEFAULT_SOURCE_LANG: str = "English"
+DEFAULT_TARGET_LANG: str = "French"
 SAME_LANGUAGE_WARNING: str = "Please pick two different languages."
 # Every alert carries its level's Material icon. With icon=None an alert is
 # a tinted box of bare text, and the glyph is what tells a warning from an
@@ -373,8 +383,6 @@ st.title("Tiny Aya Translate")
 
 # -- Session state defaults ---------------------------------------------------
 
-st.session_state.setdefault("source_lang", "English")
-st.session_state.setdefault("target_lang", "French")
 st.session_state.setdefault("translate_input", "")
 st.session_state.setdefault("translate_output", "")
 st.session_state.setdefault("download_name", DEFAULT_DOWNLOAD_NAME)
@@ -464,12 +472,21 @@ def swap_languages() -> None:
 
 with st.container(border=True):
     col_from, col_swap, col_to = st.columns([10, 1, 10], vertical_alignment="center")
+    # bind="query-params": the pair lives in the URL (?source_lang=…&target_lang=…),
+    # so a reload or a restart keeps it and a link carries it; a value that
+    # is not in LANGUAGES falls back to the default rather than raising, and
+    # a value equal to the default is left out of the URL (see the defaults
+    # under Config for why they are index=, not seeds). swap_languages'
+    # session-state writes are the sanctioned programmatic route -- a
+    # callback runs before the widget renders -- and the URL follows them.
     with col_from:
         st.selectbox(
             "From",
             LANGUAGES,
+            index=LANGUAGES.index(DEFAULT_SOURCE_LANG),
             key="source_lang",
             on_change=clear_translate_output,
+            bind="query-params",
             label_visibility="collapsed",
         )
     # Bounded and centred, not stretched. Every st.columns child picks up
@@ -497,8 +514,10 @@ with st.container(border=True):
         st.selectbox(
             "To",
             LANGUAGES,
+            index=LANGUAGES.index(DEFAULT_TARGET_LANG),
             key="target_lang",
             on_change=clear_translate_output,
+            bind="query-params",
             label_visibility="collapsed",
         )
 

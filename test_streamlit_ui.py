@@ -118,6 +118,52 @@ def test_target_language_default(app: AppTest) -> None:
     assert app.selectbox("target_lang").value == "French"
 
 
+# -- URL-bound pickers ---------------------------------------------------------
+
+
+def _app_at(**params: str) -> AppTest:
+    """Render the page as if opened at ?key=value&… (bound pickers only)."""
+    at = _new_app()
+    for key, value in params.items():
+        at.query_params[key] = value
+    with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
+        _run(at)
+    return at
+
+
+def test_pickers_open_at_rest_with_a_clean_url() -> None:
+    at = _app_at()
+    assert at.selectbox("source_lang").value == "English"
+    assert at.selectbox("target_lang").value == "French"
+    assert not dict(at.query_params)
+
+
+def test_pickers_follow_the_url() -> None:
+    at = _app_at(source_lang="French", target_lang="English")
+    assert at.selectbox("source_lang").value == "French"
+    assert at.selectbox("target_lang").value == "English"
+
+
+def test_reverse_pair_link_does_not_collapse_to_the_same_language() -> None:
+    # The regression the widget-owned defaults exist for. A bound value is
+    # dropped from the URL when it equals the *widget's* default and read
+    # back against it; with session-state seeds both widgets defaulted to
+    # LANGUAGES[0], so ?target_lang=English was dropped as "the default" and
+    # the seeded French won -- a shared French -> English link opened as
+    # French -> French, the one pair the app refuses. Reproduced before the
+    # seeds went. With index= the target's default is French, so English is
+    # a real value.
+    at = _app_at(target_lang="English")
+    assert at.selectbox("target_lang").value == "English"
+
+
+def test_unknown_url_value_falls_back_to_the_default() -> None:
+    at = _app_at(source_lang="Klingon")
+    assert at.selectbox("source_lang").value == "English"
+    assert not at.error
+    assert "source_lang" not in dict(at.query_params)
+
+
 # -- Swap button ---------------------------------------------------------------
 
 
@@ -137,6 +183,14 @@ def test_swap_flips_languages(app: AppTest) -> None:
 
     assert app.selectbox("source_lang").value == "French"
     assert app.selectbox("target_lang").value == "English"
+    # Both pickers are bound to the URL, and a callback's session-state
+    # write is the sanctioned programmatic route: the URL follows the swap.
+    # (A picker change is synced by the frontend, which AppTest does not
+    # run, so the URL is asserted here and not after set_value.)
+    assert dict(app.query_params) == {
+        "source_lang": ["French"],
+        "target_lang": ["English"],
+    }
 
 
 def test_swap_moves_output_to_input() -> None:

@@ -376,6 +376,18 @@ def test_theme_fonts_are_bundled_not_fetched() -> None:
     walk(_load_theme_config()["theme"], "theme")
 
 
+def test_widget_default_warning_is_muted_for_the_bound_pickers() -> None:
+    # The pickers own their defaults (index=) so the URL binding measures
+    # against the right pair, and swap_languages writes both keys from a
+    # callback -- the documented route -- which trips selectbox's "created
+    # with a default value but also had its value set via the Session State
+    # API" log once per process for the picker whose index is not 0. The
+    # mute is Streamlit's own flag for that false positive; config.toml
+    # records why. Without it the swap logs a stack trace on first use.
+    config = _load_theme_config()
+    assert config["global"]["disableWidgetStateDuplicationWarning"] is True
+
+
 def test_usage_stats_are_off() -> None:
     # Streamlit's browser.gatherUsageStats defaults to true, and the frontend
     # then fetches data.streamlit.io/metrics.json (once per browser; cached in
