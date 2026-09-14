@@ -8,7 +8,13 @@ from streamlit.proto.RootContainer_pb2 import RootContainer
 from streamlit.testing.v1 import AppTest
 from streamlit.testing.v1.element_tree import Block
 
-from streamlit_app import MAX_INPUT_CHARS, escape_markdown
+from streamlit_app import (
+    DEFAULT_SOURCE_LANG,
+    DEFAULT_TARGET_LANG,
+    LANGUAGES,
+    MAX_INPUT_CHARS,
+    escape_markdown,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -111,11 +117,11 @@ def test_title_is_app_name(app: AppTest) -> None:
 
 
 def test_source_language_default(app: AppTest) -> None:
-    assert app.selectbox("source_lang").value == "English"
+    assert app.selectbox("source_lang").value == DEFAULT_SOURCE_LANG == "English"
 
 
 def test_target_language_default(app: AppTest) -> None:
-    assert app.selectbox("target_lang").value == "French"
+    assert app.selectbox("target_lang").value == DEFAULT_TARGET_LANG == "French"
 
 
 # -- URL-bound pickers ---------------------------------------------------------
@@ -133,8 +139,8 @@ def _app_at(**params: str) -> AppTest:
 
 def test_pickers_open_at_rest_with_a_clean_url() -> None:
     at = _app_at()
-    assert at.selectbox("source_lang").value == "English"
-    assert at.selectbox("target_lang").value == "French"
+    assert at.selectbox("source_lang").value == DEFAULT_SOURCE_LANG
+    assert at.selectbox("target_lang").value == DEFAULT_TARGET_LANG
     assert not dict(at.query_params)
 
 
@@ -152,9 +158,14 @@ def test_reverse_pair_link_does_not_collapse_to_the_same_language() -> None:
     # the seeded French won -- a shared French -> English link opened as
     # French -> French, the one pair the app refuses. Reproduced before the
     # seeds went. With index= the target's default is French, so English is
-    # a real value.
-    at = _app_at(target_lang="English")
-    assert at.selectbox("target_lang").value == "English"
+    # a real value. The premise is asserted with it: the regression only
+    # exists while the target's default is not LANGUAGES[0], and the URL
+    # value below is that first entry, so a reordering that put the target
+    # default at index 0 would void the test rather than quietly pass it.
+    first = LANGUAGES[0]
+    assert LANGUAGES.index(DEFAULT_TARGET_LANG) != 0
+    at = _app_at(target_lang=first)
+    assert at.selectbox("target_lang").value == first
 
 
 def test_unknown_url_value_falls_back_to_the_default() -> None:

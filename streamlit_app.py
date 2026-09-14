@@ -271,11 +271,17 @@ def clip_to_input_cap(text: str, limit: int = MAX_INPUT_CHARS) -> str:
 
 # Every ASCII punctuation character -- exactly the set CommonMark permits to be
 # backslash-escaped, and deliberately wider than "the metacharacters one thinks
-# of". Streamlit's alert bodies render more than CommonMark: LaTeX ($...$),
-# emoji shortcodes (:tada:) and HTML entities (&amp;) are live too, so a
-# CommonMark-only class would still let an exception's text render as markup.
-# A backslash before ASCII punctuation is never displayed, so over-escaping
-# costs nothing.
+# of". Streamlit's alert bodies render more than CommonMark: LaTeX ($...$)
+# and HTML entities (&amp;) are live too, so a CommonMark-only class would
+# still let an exception's text render as markup. Emoji shortcodes (:tada:)
+# are covered by a different mechanism than the escape itself: the bundle
+# loads remark-emoji only when its gate regex matches the *raw* body
+# (StreamlitMarkdown: /:(?!material\/|streamlit:)[\w+-][\w_+-]*:/), and
+# `\:tada\:` fails that match at the closing `\:` -- remark-emoji works on
+# text nodes after escapes resolve and would convert it otherwise. If a
+# Streamlit bump loads the plugin unconditionally, that protection goes
+# while the escape stays; re-read the gate on a bump. A backslash before
+# ASCII punctuation is never displayed, so over-escaping costs nothing.
 _MD_PUNCTUATION = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 _MD_SPECIAL_RE = re.compile(f"([{re.escape(_MD_PUNCTUATION)}])")
 
@@ -290,6 +296,19 @@ def escape_markdown(text: str) -> str:
     through the span between them (the bundle's remark-gfm keeps
     ``singleTilde`` on). Applied at every site that interpolates an
     exception into an alert.
+
+    The contract is inline: escapes neutralise emphasis, code spans,
+    links, headings, lists, strikethrough, LaTeX and entities. Two things
+    they cannot reach. Streamlit's own typographic substitutions run on
+    text nodes *after* escapes resolve, unconditionally (the bundle's
+    ``Jp()`` plugin): a whitespace-delimited ``->``, ``<-``, ``<->``,
+    ``--``, ``>=``, ``<=`` or ``~=`` still renders as an arrow, dash or
+    comparison glyph -- cosmetic, the meaning survives, and an inline code
+    span (the one node type it skips) would break on any backtick or
+    newline in the message. And block structure is set by line shape, not
+    characters: a blank line followed by four-space-indented text is still
+    an indented code block, and a line ending in two spaces a hard break.
+    Exception text of that shape is rare and reads acceptably; accepted.
     """
     return _MD_SPECIAL_RE.sub(r"\\\1", text)
 
@@ -489,12 +508,17 @@ def swap_languages() -> None:
 # untouched), 408/408 at 1080, 332/332 at 800, 246.5/246.5 at 640,
 # 186.5/186.5 at 520 (Chrome's window floor on macOS), the swap 40 at
 # every one; at 400 the default wrap=True moves To to a second row (row
-# 128 tall) rather than stacking all three. A flex row is
-# content-proportional -- the docked buttons are st.columns for exactly
-# that reason -- and it comes out 50/50 here only because the two pickers
-# are the same widget with the same collapsed label; a visible label on
-# one of them would tilt it. No vertical_alignment: all three children
-# are 40 tall, so it would be a no-op, as it was on the docked row.
+# 128 tall) rather than stacking all three. The 50/50 is a property of
+# the widget class, not of the two pickers happening to match: in the
+# 1.63.0 bundle a stretch child of a horizontal container gets
+# `flex: 1 1 <minStretchWidth>`, a selectbox is a MEDIUM_ELEMENT with
+# minStretchWidth 8rem -- a fixed basis, so two of them split evenly
+# whatever their labels or values -- while a button is a DEFAULT element
+# at fit-content, which grows from its own label. That is why the docked
+# buttons stay st.columns and these two do not need to; a widget of
+# another class in this row (a LARGE element at 14rem) would tilt it, a
+# visible label would not. No vertical_alignment: all three children are
+# 40 tall, so it would be a no-op, as it was on the docked row.
 with st.container(border=True, horizontal=True):
     # bind="query-params": the pair lives in the URL (?source_lang=…&target_lang=…),
     # so a reload or a restart keeps it and a link carries it; a value that
@@ -748,9 +772,13 @@ if translate_clicked:
                 # so it would push the whole side-by-side row down for the
                 # duration and snap it back. A skeleton at PANEL_HEIGHT
                 # reflows nothing: it occupies the box render_output is
-                # about to. It also clears the *previous* translation, which
-                # used to sit there looking current until the first new
-                # token overwrote it.
+                # about to. On this run it replaces the empty-state
+                # text_area, not the previous translation: Translate's
+                # on_click has already cleared translate_output before the
+                # panel rendered (see clear_translate_output). Until
+                # 2026-09-14 the skeleton was what took the previous
+                # translation off the screen, which used to sit there
+                # looking current until the first new token overwrote it.
                 #
                 # No st.spinner alongside it: that would be a second
                 # indicator for one operation, at the very cursor position

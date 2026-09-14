@@ -852,17 +852,21 @@ def test_every_exception_reaches_an_alert_escaped() -> None:
 
 
 def test_every_alert_carries_its_level_icon() -> None:
-    # Walked, not counted: every `.warning(` / `.error(` call on any receiver
-    # (warning_slot, ensure_model's slot) must pass the icon named for its
-    # level, so a new alert cannot ship as a bare tinted box and a warning
-    # cannot borrow the error glyph.
+    # Walked, not counted: every `.warning(` / `.error(` call on an alert
+    # receiver -- `st` itself, or a name ending in `slot`, the module's
+    # convention for its st.empty() placeholders (warning_slot, ensure_model's
+    # slot) -- must pass the icon named for its level, so a new alert cannot
+    # ship as a bare tinted box and a warning cannot borrow the error glyph.
+    # Scoped to those receivers so a `_LOGGER.warning(...)` or a
+    # `warnings.warn(...)`, which have no icon, cannot trip it.
     expected = {"warning": "WARNING_ICON", "error": "ERROR_ICON"}
     seen = 0
     for node in ast.walk(ast.parse(_APP_SOURCE)):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             continue
         level = node.func.attr
-        if level not in expected:
+        receiver = ast.unparse(node.func.value)
+        if level not in expected or not (receiver == "st" or receiver.endswith("slot")):
             continue
         seen += 1
         icons = [ast.unparse(kw.value) for kw in node.keywords if kw.arg == "icon"]
