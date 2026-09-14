@@ -183,13 +183,25 @@
 # box you could not see; red90 #bd4043 drops to 4.23:1. Now #7a5904 on
 # #f2e7bf (5.20:1, box 1.14 vs paper) and #a33636 on #f9e1db (5.36:1, box
 # 1.15). The red box is the value Streamlit would derive anyway (red80 at
-# 10% over this paper), stated so it can be read off the file. Dark red
-# and yellow are left at stock, measured over this page: #ff6c6c on
-# #452624 4.89:1 (box 1.36 vs page), #ffffc2 on #454312 9.85:1 (1.81). The
-# error margin is 0.39; if it ever needs more, red50 #ff8c8c -- one stop up
-# Streamlit's own scale -- measures 6.03 on the same box. The bare
-# redColor/yellowColor/blueColor keys are untouched; nothing in the app
-# paints them (they feed :red[] markdown, metrics and badges).
+# 10% over this paper), stated so it can be read off the file. Light green
+# gets the same treatment since 2026-09-14, for the same reason and with
+# the same margin: stock's green90 #158237 on the tint the bundle derives
+# (green70 at 10% over this paper, #e3f0e0) is 4.16:1, under AA, and the
+# tint is 1.08:1 against the paper, the near-invisible box yellow had. Now
+# #116329 -- the bundled theme reference's own "darkened for readability"
+# green, hue ~138, Streamlit's green rather than the accent's verdigris at
+# 166 -- on #d9ebdb (5.93:1, box 1.14 vs paper, the box at the same
+# muted saturation as the yellow's). Nothing paints st.success today; the
+# pair is here so a future one lands at AA rather than on the one status
+# family this file had left under it. Dark green is left at stock,
+# measured over this page: green50 #5ce488 on #1e3b24 (green60 at 20%)
+# 7.57:1, box 1.49 vs page. Dark red and yellow are left at stock too,
+# measured over this page: #ff6c6c on #452624 4.89:1 (box 1.36 vs page),
+# #ffffc2 on #454312 9.85:1 (1.81). The error margin is 0.39; if it ever
+# needs more, red50 #ff8c8c -- one stop up Streamlit's own scale --
+# measures 6.03 on the same box. The bare redColor/yellowColor/blueColor/
+# greenColor keys are untouched; nothing in the app paints them (they feed
+# :red[] markdown, metrics and badges).
 #
 # TYPE -- two keys, both fonts bundled in the Streamlit wheel
 # (static/media/SourceSerifVariable-Roman.*.woff2, SourceSansVF-Upright.*.woff2),
@@ -319,6 +331,8 @@ yellowTextColor = "#7a5904"
 yellowBackgroundColor = "#f2e7bf"
 redTextColor = "#a33636"
 redBackgroundColor = "#f9e1db"
+greenTextColor = "#116329"
+greenBackgroundColor = "#d9ebdb"
 
 [theme.dark]
 primaryColor = "#33826f"

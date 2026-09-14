@@ -339,6 +339,24 @@ def test_caption_readable_in_both_modes() -> None:
         assert ratio >= 4.5, f"{mode} caption {caption} on {bg} contrast {ratio:.2f}"
 
 
+def test_restated_light_status_pairs_are_readable() -> None:
+    # Every status family light mode restates -- because stock's alert text
+    # was tuned for #ffffff and drops under AA on this paper -- must clear
+    # 4.5:1 as text on its own box, and the box must be visible against the
+    # paper (stock's derived yellow tint was 1.00:1, a box you could not
+    # see; the file holds the four at 1.13-1.15). Walked over the families
+    # present, so a fifth pair added later is measured too, and a family
+    # restated with only one half fails on the KeyError.
+    light = _load_theme_config()["theme"]["light"]
+    paper = light["backgroundColor"]
+    families = {k[: -len("TextColor")] for k in light if k.endswith("TextColor")}
+    assert families == {"blue", "yellow", "red", "green"}, families
+    for family in families:
+        text, box = light[f"{family}TextColor"], light[f"{family}BackgroundColor"]
+        assert _contrast_ratio(text, box) >= 4.5, family
+        assert _contrast_ratio(box, paper) >= 1.1, family
+
+
 def test_code_background_matches_secondary_background() -> None:
     # The input text_area (secondaryBackgroundColor) and the output st.code
     # (codeBackgroundColor) sit side by side in one row; unpinned,
