@@ -470,8 +470,29 @@ def swap_languages() -> None:
 
 # -- Language bar -------------------------------------------------------------
 
-with st.container(border=True):
-    col_from, col_swap, col_to = st.columns([10, 1, 10], vertical_alignment="center")
+# One horizontal flex row, not st.columns([10, 1, 10]) (since 2026-09-14).
+# The row wants "two equal stretch controls with a fixed 40px button
+# between", which is a flex description, not a grid ratio: in a horizontal
+# container a pixel-width child is `flex: 0 0 40px` and a stretch child
+# `flex: 1 1`, so the button is 40 wide at every viewport and the pickers
+# split the rest. Under the 1/21 column the button was clamped to its
+# column -- measured, both layouts in same-origin iframes under 1.63.0:
+# 31.6px at 1080 (the hero viewport), 24.4 at 800 -- and below 640 every
+# st.columns child picks up min-width: calc(100% - 1.5rem) regardless of
+# weight, so the swap column became a full row and a tertiary button (no
+# fill, no border) a 425x40 invisible tap target, which is what the fixed
+# 40 was first added to bound. Now: pickers 828/828 at 1920 (the row is
+# still 72 tall at y=184.8, so the fold budget at PANEL_HEIGHT is
+# untouched), 408/408 at 1080, 332/332 at 800, 246.5/246.5 at 640,
+# 186.5/186.5 at 520 (Chrome's window floor on macOS), the swap 40 at
+# every one; at 400 the default wrap=True moves To to a second row (row
+# 128 tall) rather than stacking all three. A flex row is
+# content-proportional -- the docked buttons are st.columns for exactly
+# that reason -- and it comes out 50/50 here only because the two pickers
+# are the same widget with the same collapsed label; a visible label on
+# one of them would tilt it. No vertical_alignment: all three children
+# are 40 tall, so it would be a no-op, as it was on the docked row.
+with st.container(border=True, horizontal=True):
     # bind="query-params": the pair lives in the URL (?source_lang=…&target_lang=…),
     # so a reload or a restart keeps it and a link carries it; a value that
     # is not in LANGUAGES falls back to the default rather than raising, and
@@ -479,47 +500,38 @@ with st.container(border=True):
     # under Config for why they are index=, not seeds). swap_languages'
     # session-state writes are the sanctioned programmatic route -- a
     # callback runs before the widget renders -- and the URL follows them.
-    with col_from:
-        st.selectbox(
-            "From",
-            LANGUAGES,
-            index=LANGUAGES.index(DEFAULT_SOURCE_LANG),
-            key="source_lang",
-            on_change=clear_translate_output,
-            bind="query-params",
-            label_visibility="collapsed",
-        )
-    # Bounded and centred, not stretched. Every st.columns child picks up
-    # min-width: calc(100% - 1.5rem) under @media (max-width: 640px)
-    # regardless of its weight, so below that breakpoint this 1-unit column
-    # becomes a full row -- and a tertiary button paints no background or
-    # border, so a stretched one became an *invisible* full-row tap target
-    # between the two pickers: measured 425x40 at a 500px viewport,
-    # clickable edge to edge, one stray tap from moving the output into the
-    # input and clearing it. A fixed 40 clamps to the parent, so the
-    # desktop column still renders the same button and only the hit area
-    # changes. It does not rescue the 640-800px band, where the column
-    # shrinks toward the 16px icon and 40 clamps down with it.
-    with col_swap.container(horizontal=True, horizontal_alignment="center"):
-        st.button(
-            "",
-            key="swap",
-            icon=":material/swap_horiz:",
-            on_click=swap_languages,
-            width=40,
-            type="tertiary",
-            help="Swap languages and move the translation into the input",
-        )
-    with col_to:
-        st.selectbox(
-            "To",
-            LANGUAGES,
-            index=LANGUAGES.index(DEFAULT_TARGET_LANG),
-            key="target_lang",
-            on_change=clear_translate_output,
-            bind="query-params",
-            label_visibility="collapsed",
-        )
+    st.selectbox(
+        "From",
+        LANGUAGES,
+        index=LANGUAGES.index(DEFAULT_SOURCE_LANG),
+        key="source_lang",
+        on_change=clear_translate_output,
+        bind="query-params",
+        label_visibility="collapsed",
+    )
+    # A fixed 40, not stretched: a tertiary button paints no background or
+    # border, so a stretched one is an invisible tap target as wide as its
+    # slot, one stray tap from moving the output into the input and
+    # clearing it. In this flex row the 40 is honoured at every width
+    # rather than clamped to a shrinking column.
+    st.button(
+        "",
+        key="swap",
+        icon=":material/swap_horiz:",
+        on_click=swap_languages,
+        width=40,
+        type="tertiary",
+        help="Swap languages and move the translation into the input",
+    )
+    st.selectbox(
+        "To",
+        LANGUAGES,
+        index=LANGUAGES.index(DEFAULT_TARGET_LANG),
+        key="target_lang",
+        on_change=clear_translate_output,
+        bind="query-params",
+        label_visibility="collapsed",
+    )
 
 # -- Warning slot (above panels) ----------------------------------------------
 
