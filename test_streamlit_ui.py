@@ -414,7 +414,11 @@ def test_controls_row_lives_in_the_bottom_bar(app: AppTest) -> None:
     # st.bottom fails on the KeyError. Pinned positively: the bar holds
     # exactly Translate and one Download, and main holds only the swap
     # button. Either button moved back into the flow (or into the sidebar)
-    # fails its bar line; a stray copy in main fails the main line.
+    # fails its bar line; a stray copy in main fails the main line. The
+    # first line is the harness guard: the day AppTest grows a public
+    # `bottom`, this fails with that message rather than as an opaque
+    # AttributeError on the private tree, and the read below moves to it.
+    assert not hasattr(app, "bottom"), "AppTest has a bottom accessor now; use it"
     bottom = app._tree[RootContainer.BOTTOM]
     assert isinstance(bottom, Block)
     assert [b.key for b in bottom.button] == ["translate"]

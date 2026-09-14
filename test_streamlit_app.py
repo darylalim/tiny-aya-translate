@@ -114,7 +114,11 @@ def test_controls_row_is_docked_and_never_stacks() -> None:
     # so a second bar nested in the translate block cannot hide), at the top
     # level, holding exactly one st.columns call, and that call opts out of
     # stacking: a stacked pair turns the sticky bar into a 168px permanent
-    # overlay below 640px.
+    # overlay below 640px. The flag is only worth pinning if the buttons are
+    # actually in those columns, so the last block ties them: the call's two
+    # targets are the only `with` receivers the buttons sit under, one each,
+    # and no button in the bar sits outside them -- a Translate emitted
+    # directly under st.bottom would pass the wrap check and still stack.
     tree = ast.parse(_APP_SOURCE)
     bottoms = [
         node
@@ -127,11 +131,35 @@ def test_controls_row_is_docked_and_never_stacks() -> None:
     columns = [
         node
         for node in ast.walk(bottoms[0])
-        if isinstance(node, ast.Call) and ast.unparse(node.func) == "st.columns"
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and ast.unparse(node.value.func) == "st.columns"
     ]
     assert len(columns) == 1
-    keywords = {kw.arg: ast.unparse(kw.value) for kw in columns[0].keywords}
+    call = columns[0].value
+    assert isinstance(call, ast.Call)
+    keywords = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
     assert keywords.get("wrap") == "False", keywords
+    (target,) = columns[0].targets
+    assert isinstance(target, ast.Tuple)
+    slots = [ast.unparse(name) for name in target.elts]
+    assert len(slots) == 2
+
+    def buttons_in(node: ast.AST) -> list[ast.Call]:
+        return [
+            n
+            for n in ast.walk(node)
+            if isinstance(n, ast.Call)
+            and ast.unparse(n.func) in {"st.button", "st.download_button"}
+        ]
+
+    per_slot = {
+        ast.unparse(w.items[0].context_expr): len(buttons_in(w))
+        for w in ast.walk(bottoms[0])
+        if isinstance(w, ast.With) and ast.unparse(w.items[0].context_expr) in slots
+    }
+    assert per_slot == dict.fromkeys(slots, 1), per_slot
+    assert len(buttons_in(bottoms[0])) == 2
 
 
 def test_warning_strings_defined_once() -> None:
