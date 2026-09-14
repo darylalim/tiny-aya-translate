@@ -805,3 +805,25 @@ def test_every_exception_reaches_an_alert_escaped() -> None:
     # waiting for a dunder in the message.
     assert not re.search(r"\{e\}", _APP_SOURCE)
     assert _APP_SOURCE.count("{escape_markdown(str(e))}") == 3
+
+
+# -- alert icons ---------------------------------------------------------------
+
+
+def test_every_alert_carries_its_level_icon() -> None:
+    # Walked, not counted: every `.warning(` / `.error(` call on any receiver
+    # (warning_slot, ensure_model's slot) must pass the icon named for its
+    # level, so a new alert cannot ship as a bare tinted box and a warning
+    # cannot borrow the error glyph.
+    expected = {"warning": "WARNING_ICON", "error": "ERROR_ICON"}
+    seen = 0
+    for node in ast.walk(ast.parse(_APP_SOURCE)):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        level = node.func.attr
+        if level not in expected:
+            continue
+        seen += 1
+        icons = [ast.unparse(kw.value) for kw in node.keywords if kw.arg == "icon"]
+        assert icons == [expected[level]], ast.unparse(node)[:80]
+    assert seen == 6

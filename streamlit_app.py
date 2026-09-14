@@ -82,6 +82,15 @@ MAX_INPUT_CHARS: int = 30000
 # neither name can drift between the paths that write it.
 DEFAULT_DOWNLOAD_NAME: str = "translation.txt"
 SAME_LANGUAGE_WARNING: str = "Please pick two different languages."
+# Every alert carries its level's Material icon. With icon=None an alert is
+# a tinted box of bare text, and the glyph is what tells a warning from an
+# error before the text is read. One name per level, so the sites cannot
+# drift; test_every_alert_carries_its_level_icon walks them. The icon span
+# carries translate="no" but no aria-hidden, so a screen reader announces
+# the ligature name ahead of the text -- the same cost the swap button's
+# icon pays, recorded under Page layout and controls in CLAUDE.md.
+WARNING_ICON: str = ":material/warning:"
+ERROR_ICON: str = ":material/error:"
 NO_OUTPUT_WARNING: str = (
     "The model returned an empty translation. Try again, or rephrase the input."
 )
@@ -352,7 +361,8 @@ def ensure_model(slot: Any) -> tuple[Any, Any] | None:
         slot.error(
             f"Failed to load model: {escape_markdown(str(e))}\n\nThe first run "
             "downloads ~3.6 GB from Hugging Face. Check your connection and "
-            "disk space, then click Translate again."
+            "disk space, then click Translate again.",
+            icon=ERROR_ICON,
         )
         return None
 
@@ -521,9 +531,9 @@ if st.session_state.translate_notice:
     _level, _text = st.session_state.translate_notice
     st.session_state.translate_notice = ""
     if _level == "error":
-        warning_slot.error(_text)
+        warning_slot.error(_text, icon=ERROR_ICON)
     else:
-        warning_slot.warning(_text)
+        warning_slot.warning(_text, icon=WARNING_ICON)
 
 # -- Side-by-side text panels -------------------------------------------------
 
@@ -668,9 +678,9 @@ with st.bottom:
 if translate_clicked:
     current_input = st.session_state.translate_input
     if not current_input.strip():
-        warning_slot.warning("Please enter some text first.")
+        warning_slot.warning("Please enter some text first.", icon=WARNING_ICON)
     elif st.session_state.source_lang == st.session_state.target_lang:
-        warning_slot.warning(SAME_LANGUAGE_WARNING)
+        warning_slot.warning(SAME_LANGUAGE_WARNING, icon=WARNING_ICON)
     # The two checks above are free, so they run before the weights load.
     # A failed load has already reported itself, so the chain just ends.
     elif (loaded := ensure_model(warning_slot)) is not None:
@@ -692,7 +702,8 @@ if translate_clicked:
             if n_tok > MAX_INPUT_TOKENS:
                 warning_slot.warning(
                     f"Input is {n_tok} tokens — "
-                    f"please keep it under {MAX_INPUT_TOKENS}."
+                    f"please keep it under {MAX_INPUT_TOKENS}.",
+                    icon=WARNING_ICON,
                 )
             else:
                 # The activity indicator belongs in the panel the result
