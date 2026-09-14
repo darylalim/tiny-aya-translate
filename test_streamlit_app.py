@@ -388,6 +388,16 @@ def test_widget_default_warning_is_muted_for_the_bound_pickers() -> None:
     assert config["global"]["disableWidgetStateDuplicationWarning"] is True
 
 
+def test_server_port_is_pinned() -> None:
+    # Unpinned, a busy 8501 moves the app to the next port at DEBUG level;
+    # a port set in config.toml counts as manually set and fails loudly
+    # instead. The README names the port, so it is pinned here too.
+    assert _load_theme_config()["server"]["port"] == 8510
+    assert "localhost:8510" in (Path(__file__).parent / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_usage_stats_are_off() -> None:
     # Streamlit's browser.gatherUsageStats defaults to true, and the frontend
     # then fetches data.streamlit.io/metrics.json (once per browser; cached in

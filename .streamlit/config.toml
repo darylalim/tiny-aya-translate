@@ -269,6 +269,20 @@
 [browser]
 gatherUsageStats = false
 
+# The port is pinned so a busy port fails loudly. Unpinned, Streamlit
+# retries the next port when 8501 is taken and says so only at DEBUG
+# level (starlette_server.py: "Port %s not available, trying to use the
+# next one."), and the only visible sign is the "Local URL" line -- which is
+# how this project's own server, and the screenshot recipe, kept landing on
+# 8502 and 8503 behind other projects' apps on 8501. A port defined in this
+# file counts as manually set (config.is_manually_set reads where_defined),
+# and a manually set port that is busy logs "Port N is not available" at
+# ERROR and exits. browser.serverPort follows it automatically. A second
+# server for a capture passes --server.port explicitly; the flag overrides
+# the file. test_server_port_is_pinned guards the key.
+[server]
+port = 8510
+
 # Both language pickers are bound to the URL (bind="query-params"), which
 # makes their defaults widget-owned (index=) rather than session-state
 # seeds: a bound value is dropped from the URL when it equals the *widget's*
