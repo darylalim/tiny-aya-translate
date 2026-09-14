@@ -23,6 +23,17 @@ def clear_st_cache() -> None:
     st.cache_resource.clear()
 
 
+def _new_app() -> AppTest:
+    """Construct the AppTest with the timeout every run in this file needs.
+
+    ``from_file`` resolves a relative path against the *caller's* file, so
+    this must stay in a module beside ``streamlit_app.py``. The default
+    timeout is 3 s; set here once rather than as ``timeout=60`` on each
+    ``run`` call, so a bare ``at.run()`` anywhere cannot fall back to 3.
+    """
+    return AppTest.from_file("streamlit_app.py", default_timeout=60)
+
+
 def _run(at: AppTest) -> AppTest:
     """Run the script and fail if it raised.
 
@@ -34,7 +45,7 @@ def _run(at: AppTest) -> AppTest:
     (the alert list) does not see it either. Every run in this file goes
     through here rather than through ``at.run`` directly.
     """
-    at.run(timeout=60)
+    at.run()
     assert not at.exception, [(e.proto.type, e.message) for e in at.exception]
     return at
 
@@ -50,7 +61,7 @@ def app() -> AppTest:
     ``_run_inference_test`` -- or the real loader runs and pulls 3.6 GB.
     """
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
     return at
 
@@ -81,9 +92,9 @@ def _run_inference_test(input_text: str, chunk_text: str) -> AppTest:
             return_value=iter([_make_stream_chunk(chunk_text)]),
         ),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value(input_text)
+        at.text_area("translate_input").set_value(input_text)
         at.button("translate").click()
         _run(at)
     return at
@@ -100,26 +111,32 @@ def test_title_is_app_name(app: AppTest) -> None:
 
 
 def test_source_language_default(app: AppTest) -> None:
-    assert app.selectbox[0].value == "English"
+    assert app.selectbox("source_lang").value == "English"
 
 
 def test_target_language_default(app: AppTest) -> None:
-    assert app.selectbox[1].value == "French"
+    assert app.selectbox("target_lang").value == "French"
 
 
 # -- Swap button ---------------------------------------------------------------
 
 
 def test_swap_button_exists(app: AppTest) -> None:
-    assert app.button("swap") is not None
+    # The wording names both side effects (output wiped, input overwritten);
+    # a plain "Swap languages" hid them, so the text is pinned, not just the
+    # tooltip's presence.
+    assert (
+        app.button("swap").help
+        == "Swap languages and move the translation into the input"
+    )
 
 
 def test_swap_flips_languages(app: AppTest) -> None:
     app.button("swap").click()
     _rerun_with_mocks(app)
 
-    assert app.selectbox[0].value == "French"
-    assert app.selectbox[1].value == "English"
+    assert app.selectbox("source_lang").value == "French"
+    assert app.selectbox("target_lang").value == "English"
 
 
 def test_swap_moves_output_to_input() -> None:
@@ -131,11 +148,11 @@ def test_swap_moves_output_to_input() -> None:
             return_value=iter([_make_stream_chunk("Bonjour")]),
         ),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
 
         # Translate "Hello" -> "Bonjour"
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -144,7 +161,7 @@ def test_swap_moves_output_to_input() -> None:
         _run(at)
 
     # Input should now contain the previous output
-    assert at.text_area[0].value == "Bonjour"
+    assert at.text_area("translate_input").value == "Bonjour"
     # Output should be cleared
     assert at.text_area[1].value == ""
 
@@ -153,13 +170,13 @@ def test_swap_keeps_typed_input_when_nothing_is_translated(app: AppTest) -> None
     # The move is guarded on a settled output. Unguarded, swapping with
     # nothing translated assigned "" over the typed text -- the one moment
     # swap is most wanted (typed, pair backwards, not yet translated).
-    app.text_area[0].set_value("typed but untranslated")
+    app.text_area("translate_input").set_value("typed but untranslated")
     app.button("swap").click()
     _rerun_with_mocks(app)
 
-    assert app.text_area[0].value == "typed but untranslated"
-    assert app.selectbox[0].value == "French"
-    assert app.selectbox[1].value == "English"
+    assert app.text_area("translate_input").value == "typed but untranslated"
+    assert app.selectbox("source_lang").value == "French"
+    assert app.selectbox("target_lang").value == "English"
 
 
 def test_swap_clips_a_long_output_to_the_input_cap() -> None:
@@ -173,7 +190,7 @@ def test_swap_clips_a_long_output_to_the_input_cap() -> None:
     at.button("swap").click()
     _rerun_with_mocks(at)
 
-    assert at.text_area[0].value == "x" * MAX_INPUT_CHARS
+    assert at.text_area("translate_input").value == "x" * MAX_INPUT_CHARS
     assert at.session_state["translate_input"] == "x" * MAX_INPUT_CHARS
 
 
@@ -203,13 +220,16 @@ def test_input_placeholder_names_the_character_cap(app: AppTest) -> None:
     # model's own tokenizer, 30,000 characters of English is ~5,756 tokens --
     # inside MAX_INPUT_TOKENS -- so for Latin scripts this really is the limit
     # a user hits. The token gate announces itself separately, with its count.
-    assert "30,000" in app.text_area[0].placeholder
+    assert "30,000" in app.text_area("translate_input").placeholder
 
 
 def test_empty_output_panel_uses_a_text_area(app: AppTest) -> None:
     # Only the EMPTY state is a text_area; a settled translation renders
     # through render_output/st.code (see test_translate_success_shows_result).
-    # Two at rest: the input and the empty output.
+    # Two at rest: the input and the empty output. The output carries no key
+    # (it is never written programmatically), so it is the one widget this
+    # file still reaches by index -- text_area[1] -- where the keyed input
+    # and pickers go by key, the way the buttons always did.
     assert len(app.text_area) == 2
 
 
@@ -251,8 +271,8 @@ def test_translate_empty_text_shows_warning(app: AppTest) -> None:
 
 
 def test_translate_same_language_shows_warning(app: AppTest) -> None:
-    app.selectbox[1].set_value("English")
-    app.text_area[0].set_value("Hello")
+    app.selectbox("target_lang").set_value("English")
+    app.text_area("translate_input").set_value("Hello")
     app.button("translate").click()
     load = _rerun_with_mocks(app)
 
@@ -266,27 +286,27 @@ def test_translate_same_language_shows_warning(app: AppTest) -> None:
 
 
 def test_change_source_language(app: AppTest) -> None:
-    app.selectbox[0].set_value("Spanish")
+    app.selectbox("source_lang").set_value("Spanish")
     _rerun_with_mocks(app)
 
-    assert app.selectbox[0].value == "Spanish"
+    assert app.selectbox("source_lang").value == "Spanish"
 
 
 def test_change_target_language(app: AppTest) -> None:
-    app.selectbox[1].set_value("Spanish")
+    app.selectbox("target_lang").set_value("Spanish")
     _rerun_with_mocks(app)
 
-    assert app.selectbox[1].value == "Spanish"
+    assert app.selectbox("target_lang").value == "Spanish"
 
 
 # -- Input constraints ---------------------------------------------------------
 
 
 def test_input_max_chars_enforced(app: AppTest) -> None:
-    app.text_area[0].set_value("x" * 30001)
+    app.text_area("translate_input").set_value("x" * 30001)
     _rerun_with_mocks(app)
 
-    value = app.text_area[0].value
+    value = app.text_area("translate_input").value
     assert value is not None
     assert len(value) <= 30000
 
@@ -296,9 +316,9 @@ def test_translate_too_many_tokens_shows_warning() -> None:
     mock_tokenizer.apply_chat_template.return_value = list(range(8193))
 
     with patch("mlx_lm.load", return_value=(MagicMock(), mock_tokenizer)):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello world")
+        at.text_area("translate_input").set_value("Hello world")
         at.button("translate").click()
         _run(at)
 
@@ -318,9 +338,9 @@ def test_translate_at_input_token_limit_succeeds() -> None:
             return_value=iter([_make_stream_chunk("OK")]),
         ),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello world")
+        at.text_area("translate_input").set_value("Hello world")
         at.button("translate").click()
         _run(at)
 
@@ -333,9 +353,9 @@ def test_translation_error_shows_message() -> None:
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
         patch("mlx_lm.stream_generate", side_effect=RuntimeError("OOM")),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -352,9 +372,9 @@ def test_tokenizer_failure_shows_message_not_traceback() -> None:
     bad_tokenizer.apply_chat_template.side_effect = RuntimeError("no chat template")
 
     with patch("mlx_lm.load", return_value=(MagicMock(), bad_tokenizer)):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -370,14 +390,36 @@ def test_empty_stream_shows_warning() -> None:
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
         patch("mlx_lm.stream_generate", return_value=iter([])),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
     warning_values = [str(w.value) for w in at.warning]
     assert any("empty translation" in v for v in warning_values)
+
+
+def test_notice_survives_exactly_one_rerun() -> None:
+    # translate_notice carries a message across the translate block's closing
+    # st.rerun() and is read once and cleared: the rerun that repaints the
+    # panel paints the warning, and the next unrelated rerun does not.
+    at = _new_app()
+    with (
+        patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
+        patch("mlx_lm.stream_generate", return_value=iter([])),
+    ):
+        _run(at)
+        at.text_area("translate_input").set_value("Hello")
+        at.button("translate").click()
+        _run(at)
+    assert any("empty translation" in str(w.value) for w in at.warning)
+    assert at.session_state["translate_notice"] == ""
+
+    _rerun_with_mocks(at)
+
+    assert not at.warning
+    assert not at.error
 
 
 def test_end_response_only_stream_shows_warning() -> None:
@@ -388,9 +430,9 @@ def test_end_response_only_stream_shows_warning() -> None:
             return_value=iter([_make_stream_chunk("<|END_RESPONSE|>")]),
         ),
     ):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -461,7 +503,7 @@ def test_page_renders_without_loading_the_model() -> None:
     input -- with no error until the user actually asks to translate.
     """
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")) as load:
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
 
     load.assert_not_called()
@@ -472,9 +514,9 @@ def test_page_renders_without_loading_the_model() -> None:
 
 def test_model_load_failure_shows_error_on_translate() -> None:
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -487,9 +529,9 @@ def test_translate_button_stays_enabled_after_a_failed_load() -> None:
     # on a fresh render would only re-test the initial state, since nothing
     # loads the model there.
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -510,7 +552,7 @@ def test_changing_a_language_clears_the_settled_translation(app: AppTest) -> Non
     _rerun_with_mocks(app)
     assert len(app.get("code")) == 1
 
-    app.selectbox[1].set_value("German")
+    app.selectbox("target_lang").set_value("German")
     _rerun_with_mocks(app)
 
     assert app.session_state["translate_output"] == ""
@@ -553,7 +595,7 @@ def _translate_with(at: AppTest, text: str, **stream_kwargs: Any) -> AppTest:
         patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())),
         patch("mlx_lm.stream_generate", **stream_kwargs),
     ):
-        at.text_area[0].set_value(text)
+        at.text_area("translate_input").set_value(text)
         at.button("translate").click()
         _run(at)
     return at
@@ -617,7 +659,7 @@ def test_failure_after_partial_output_keeps_the_partial() -> None:
         yield _make_stream_chunk("Bonjour le ")
         raise RuntimeError("OOM")
 
-    at = AppTest.from_file("streamlit_app.py")
+    at = _new_app()
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
         _run(at)
     _translate_with(at, "hello world", side_effect=stream_then_die)
@@ -631,7 +673,7 @@ def test_failure_after_partial_output_keeps_the_partial() -> None:
 def test_first_failure_keeps_the_empty_state_panel() -> None:
     # An earlier fix painted a blank st.code here, leaving a featureless grey
     # rectangle where the "Translation appears here" panel had been.
-    at = AppTest.from_file("streamlit_app.py")
+    at = _new_app()
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
         _run(at)
     _translate_with(at, "hello", side_effect=RuntimeError("OOM"))
@@ -656,9 +698,9 @@ def _the_error_starting(at: AppTest, prefix: str) -> str:
 
 def test_load_failure_message_is_escaped_for_markdown() -> None:
     with patch("mlx_lm.load", side_effect=RuntimeError(_HOSTILE_MESSAGE)):
-        at = AppTest.from_file("streamlit_app.py")
+        at = _new_app()
         _run(at)
-        at.text_area[0].set_value("Hello")
+        at.text_area("translate_input").set_value("Hello")
         at.button("translate").click()
         _run(at)
 
@@ -668,7 +710,7 @@ def test_load_failure_message_is_escaped_for_markdown() -> None:
 
 
 def test_stream_failure_message_is_escaped_for_markdown() -> None:
-    at = AppTest.from_file("streamlit_app.py")
+    at = _new_app()
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
         _run(at)
     _translate_with(at, "hello", side_effect=RuntimeError(_HOSTILE_MESSAGE))
@@ -683,7 +725,7 @@ def test_partial_failure_message_is_escaped_for_markdown() -> None:
         yield _make_stream_chunk("Bonjour le ")
         raise RuntimeError(_HOSTILE_MESSAGE)
 
-    at = AppTest.from_file("streamlit_app.py")
+    at = _new_app()
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
         _run(at)
     _translate_with(at, "hello world", side_effect=stream_then_die)
