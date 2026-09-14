@@ -49,15 +49,18 @@ MAX_INPUT_TOKENS: int = 8192
 # Shared UI constants. PANEL_HEIGHT sizes the input panel, the empty-state
 # output panel, the skeleton and render_output alike.
 #
-# 438 is a budget, not a taste. It is the tallest panel at which the resting
+# 447 is a budget, not a taste. It is the tallest panel at which the resting
 # page fits the 1920x839 viewport the main display actually gives (a 1080
 # display with the Dock showing, Chrome at its 960px maximum) with nothing
 # to scroll -- one pixel over and macOS with a mouse attached paints a
-# classic 11px scrollbar that takes layout width. Measured 2026-09-13 with
+# classic 11px scrollbar that takes layout width. Measured 2026-09-14 with
 # getBoundingClientRect under Streamlit 1.63.0, controls docked (see the
-# controls row): 96 top padding + 72.8 title container + 16 + 72 language
-# row + 16 + panels + 16 main bottom padding + 112 bar = 400.8 + panels, so
-# 438.2 is the ceiling. Anything added above the bar costs its height plus a
+# controls row), the title at headingFontSizes 2.25rem: 96 top padding +
+# 63.2 title container + 16 + 72 language row + 16 + panels + 16 main
+# bottom padding + 112 bar = 391.2 + panels, so 447.8 is the ceiling (it
+# was 438.2 with the 44px default title's 72.8 container, on 2026-09-13;
+# the 9.6 the smaller title freed went to the panels, the whole point of
+# the budget). Anything added above the bar costs its height plus a
 # 16px gap, and an alert in warning_slot spends it for as long as it shows:
 # the three pre-stream warnings and the drained empty-output/failure notice
 # each add 56 + 16, the page overflows to 911, and at scrollTop 0 the opaque
@@ -73,7 +76,7 @@ MAX_INPUT_TOKENS: int = 8192
 # height (the bundle sets resize:none only for a stretched one), so more
 # input lines are a drag away, at the cost of scrolling; the st.code output
 # does not follow.
-PANEL_HEIGHT: int = 438
+PANEL_HEIGHT: int = 447
 # Input cap. Reaches the browser as HTML maxlength, so it truncates
 # silently -- the placeholder names it because nothing else can.
 MAX_INPUT_CHARS: int = 30000

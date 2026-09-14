@@ -92,9 +92,10 @@ def test_panel_height_fits_the_main_display_fold() -> None:
     # display gives (1080 tall, the Dock showing, Chrome at 960) with nothing
     # to scroll, because a page that scrolls on macOS with a mouse attached
     # also grows a classic 11px scrollbar that takes layout width. Ledger
-    # measured 2026-09-13 with getBoundingClientRect, Streamlit 1.63.0, the
-    # controls docked in st.bottom: 6rem top padding, the st.title element
-    # container, the root block's two 16px gaps around the bordered language
+    # measured 2026-09-14 with getBoundingClientRect, Streamlit 1.63.0, the
+    # controls docked in st.bottom and the title at headingFontSizes 2.25rem
+    # (63.2; it was 72.8 at the 44px default): 6rem top padding, the st.title
+    # element container, the root block's two 16px gaps around the bordered language
     # row, the main block's 1rem bottom padding (st.bottom's doing -- it is
     # 10rem without one), and the bar itself, 1rem + the 40px buttons +
     # 3.5rem. Static arithmetic: it fails a bump of the constant, catches a
@@ -102,7 +103,7 @@ def test_panel_height_fits_the_main_display_fold() -> None:
     # see Streamlit's chrome move on an upgrade -- re-measure section.stMain's
     # scrollHeight against clientHeight then, rather than trust it. `<=`, not
     # `==`, so deliberate slack still passes.
-    chrome = 96 + 72.8 + 16 + 72 + 16 + 16 + (16 + 40 + 56)
+    chrome = 96 + 63.2 + 16 + 72 + 16 + 16 + (16 + 40 + 56)
     assert chrome + streamlit_app.PANEL_HEIGHT <= 839
 
 

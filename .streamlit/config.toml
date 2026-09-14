@@ -203,7 +203,7 @@
 # greenColor keys are untouched; nothing in the app paints them (they feed
 # :red[] markdown, metrics and badges).
 #
-# TYPE -- two keys, both fonts bundled in the Streamlit wheel
+# TYPE -- two font keys and one size key; both fonts bundled in the Streamlit wheel
 # (static/media/SourceSerifVariable-Roman.*.woff2, SourceSansVF-Upright.*.woff2),
 # zero network. The README's privacy promise makes that a hard rule: a
 # Google Fonts URL fires on every page load. The bundle maps the generic
@@ -216,6 +216,13 @@
 # system's CJK/Thai/Arabic faces exactly as before. It is the largest asset
 # the theme adds: the Roman woff2 is 429 KB, served by the local Streamlit
 # server on the first load (Source Sans Upright is 170 KB, for scale).
+# headingFontSizes = ["2.25rem"] (since 2026-09-14) sets that title at 36px
+# rather than Streamlit's 2.75rem = 44px default, inside the 28-40px h1
+# range the bundled theme reference gives; the one-element array form
+# leaves h2-h6 at their defaults (a bare string is expanded to all six
+# server-side). At the bundle's 1.2 heading line-height the title
+# container goes 72.8 -> 63.2, and the 9.6px went to the panels:
+# PANEL_HEIGHT in streamlit_app.py moved 438 -> 447 on the same budget.
 # codeFont = "sans-serif" is the typographic half of the codeBackgroundColor
 # pin below, and the one-line reason is that a translation is prose, not
 # code. The output panel is st.code only because that element can be
@@ -316,6 +323,7 @@ disableWidgetStateDuplicationWarning = true
 
 [theme]
 headingFont = "serif"
+headingFontSizes = ["2.25rem"]
 codeFont = "sans-serif"
 
 [theme.light]
