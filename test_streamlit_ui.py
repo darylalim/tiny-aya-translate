@@ -8,7 +8,7 @@ from streamlit.proto.RootContainer_pb2 import RootContainer
 from streamlit.testing.v1 import AppTest
 from streamlit.testing.v1.element_tree import Block
 
-from streamlit_app import MAX_INPUT_CHARS
+from streamlit_app import MAX_INPUT_CHARS, escape_markdown
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +23,22 @@ def clear_st_cache() -> None:
     st.cache_resource.clear()
 
 
+def _run(at: AppTest) -> AppTest:
+    """Run the script and fail if it raised.
+
+    ``AppTest.run`` returns normally when the script raises: the runner
+    reports the run as SCRIPT_STOPPED_WITH_SUCCESS "even if we were stopped
+    with an exception" (local_script_runner.py), and the traceback lands in
+    the element tree as ``at.exception`` with session state intact -- so a
+    test that asserts on state alone passes over a crash, and ``at.error``
+    (the alert list) does not see it either. Every run in this file goes
+    through here rather than through ``at.run`` directly.
+    """
+    at.run(timeout=60)
+    assert not at.exception, [(e.proto.type, e.message) for e in at.exception]
+    return at
+
+
 @pytest.fixture
 def app() -> AppTest:
     """Create an AppTest instance that has completed its initial render.
@@ -35,7 +51,7 @@ def app() -> AppTest:
     """
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
     return at
 
 
@@ -46,7 +62,7 @@ def _rerun_with_mocks(app: AppTest) -> MagicMock:
     assert on the returned mock.
     """
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())) as load:
-        app.run(timeout=60)
+        _run(app)
     return load
 
 
@@ -66,10 +82,10 @@ def _run_inference_test(input_text: str, chunk_text: str) -> AppTest:
         ),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value(input_text)
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
     return at
 
 
@@ -116,16 +132,16 @@ def test_swap_moves_output_to_input() -> None:
         ),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
 
         # Translate "Hello" -> "Bonjour"
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
         # Swap
         at.button("swap").click()
-        at.run(timeout=60)
+        _run(at)
 
     # Input should now contain the previous output
     assert at.text_area[0].value == "Bonjour"
@@ -281,10 +297,10 @@ def test_translate_too_many_tokens_shows_warning() -> None:
 
     with patch("mlx_lm.load", return_value=(MagicMock(), mock_tokenizer)):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello world")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     warning_values = [str(w.value) for w in at.warning]
     assert any("8193" in v and "8192" in v for v in warning_values)
@@ -303,10 +319,10 @@ def test_translate_at_input_token_limit_succeeds() -> None:
         ),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello world")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     assert at.get("code")[0].value == "OK"  # ty: ignore[unresolved-attribute]
     assert not at.warning
@@ -318,10 +334,10 @@ def test_translation_error_shows_message() -> None:
         patch("mlx_lm.stream_generate", side_effect=RuntimeError("OOM")),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     error_values = [str(e.value) for e in at.error]
     assert any("Translation failed" in v and "OOM" in v for v in error_values)
@@ -337,10 +353,10 @@ def test_tokenizer_failure_shows_message_not_traceback() -> None:
 
     with patch("mlx_lm.load", return_value=(MagicMock(), bad_tokenizer)):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     assert not at.exception
     error_values = [str(e.value) for e in at.error]
@@ -355,10 +371,10 @@ def test_empty_stream_shows_warning() -> None:
         patch("mlx_lm.stream_generate", return_value=iter([])),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     warning_values = [str(w.value) for w in at.warning]
     assert any("empty translation" in v for v in warning_values)
@@ -373,10 +389,10 @@ def test_end_response_only_stream_shows_warning() -> None:
         ),
     ):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     warning_values = [str(w.value) for w in at.warning]
     assert any("empty translation" in v for v in warning_values)
@@ -446,7 +462,7 @@ def test_page_renders_without_loading_the_model() -> None:
     """
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")) as load:
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
 
     load.assert_not_called()
     assert len(at.selectbox) == 2
@@ -457,10 +473,10 @@ def test_page_renders_without_loading_the_model() -> None:
 def test_model_load_failure_shows_error_on_translate() -> None:
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     error_values = [e.value for e in at.error]
     assert any("Failed to load model" in str(v) for v in error_values)
@@ -472,10 +488,10 @@ def test_translate_button_stays_enabled_after_a_failed_load() -> None:
     # loads the model there.
     with patch("mlx_lm.load", side_effect=RuntimeError("download failed")):
         at = AppTest.from_file("streamlit_app.py")
-        at.run(timeout=60)
+        _run(at)
         at.text_area[0].set_value("Hello")
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
 
     # A failed load must not disable the button: @st.cache_resource does not
     # memoize the exception, so a retry works without reloading the page.
@@ -539,7 +555,7 @@ def _translate_with(at: AppTest, text: str, **stream_kwargs: Any) -> AppTest:
     ):
         at.text_area[0].set_value(text)
         at.button("translate").click()
-        at.run(timeout=60)
+        _run(at)
     return at
 
 
@@ -570,6 +586,32 @@ def test_failure_without_output_does_not_leave_a_stale_download() -> None:
     assert at.get("download_button")[0].disabled  # ty: ignore[unresolved-attribute]
 
 
+def test_previous_translation_is_not_downloadable_while_the_next_streams() -> None:
+    # The bar renders before the translate block, from translate_output and
+    # download_name as they stand at the top of the run. Translate's on_click
+    # clears both before the script runs, so the run that streams paints
+    # Download disabled with no bytes; before that, the previous translation
+    # stayed downloadable -- under the previous target's name -- for the
+    # whole stream, while the skeleton had already cleared it from the panel.
+    # The two end-state tests above cannot see the window, so it is read from
+    # inside the stream, on the script thread, after the bar has rendered.
+    seen: dict[str, str] = {}
+
+    def record_then_stream(*_args: object, **_kwargs: object):
+        seen["output"] = st.session_state["translate_output"]
+        seen["name"] = st.session_state["download_name"]
+        yield _make_stream_chunk("Au revoir")
+
+    at = _run_inference_test(input_text="hello world", chunk_text="Bonjour le monde")
+    assert at.session_state["download_name"] == "translation-French.txt"
+
+    _translate_with(at, "goodbye", side_effect=record_then_stream)
+
+    assert seen == {"output": "", "name": "translation.txt"}
+    assert at.session_state["translate_output"] == "Au revoir"
+    assert not at.get("download_button")[0].disabled  # ty: ignore[unresolved-attribute]
+
+
 def test_failure_after_partial_output_keeps_the_partial() -> None:
     def stream_then_die(*_args: object, **_kwargs: object):
         yield _make_stream_chunk("Bonjour le ")
@@ -577,7 +619,7 @@ def test_failure_after_partial_output_keeps_the_partial() -> None:
 
     at = AppTest.from_file("streamlit_app.py")
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
-        at.run(timeout=60)
+        _run(at)
     _translate_with(at, "hello world", side_effect=stream_then_die)
 
     assert any("after partial output" in str(e.value) for e in at.error)
@@ -591,8 +633,61 @@ def test_first_failure_keeps_the_empty_state_panel() -> None:
     # rectangle where the "Translation appears here" panel had been.
     at = AppTest.from_file("streamlit_app.py")
     with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
-        at.run(timeout=60)
+        _run(at)
     _translate_with(at, "hello", side_effect=RuntimeError("OOM"))
 
     assert not at.get("code")
     assert len(at.text_area) == 2
+
+
+# -- Exception text in alerts --------------------------------------------------
+
+# Shaped like a real Python message: unescaped, the dunder renders as bold,
+# the tildes as strikethrough, the brackets as a link and the backticks as
+# code. Each failure path has its own f-string, so each is pinned through
+# its own sink; the escaping itself is unit-tested in test_streamlit_app.py.
+_HOSTILE_MESSAGE = "Model.__init__() ~missing~ [1](x) `arg`"
+
+
+def _the_error_starting(at: AppTest, prefix: str) -> str:
+    (value,) = [str(e.value) for e in at.error if str(e.value).startswith(prefix)]
+    return value
+
+
+def test_load_failure_message_is_escaped_for_markdown() -> None:
+    with patch("mlx_lm.load", side_effect=RuntimeError(_HOSTILE_MESSAGE)):
+        at = AppTest.from_file("streamlit_app.py")
+        _run(at)
+        at.text_area[0].set_value("Hello")
+        at.button("translate").click()
+        _run(at)
+
+    value = _the_error_starting(at, "Failed to load model: ")
+    assert escape_markdown(_HOSTILE_MESSAGE) in value
+    assert _HOSTILE_MESSAGE not in value
+
+
+def test_stream_failure_message_is_escaped_for_markdown() -> None:
+    at = AppTest.from_file("streamlit_app.py")
+    with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
+        _run(at)
+    _translate_with(at, "hello", side_effect=RuntimeError(_HOSTILE_MESSAGE))
+
+    value = _the_error_starting(at, "Translation failed: ")
+    assert escape_markdown(_HOSTILE_MESSAGE) in value
+    assert _HOSTILE_MESSAGE not in value
+
+
+def test_partial_failure_message_is_escaped_for_markdown() -> None:
+    def stream_then_die(*_args: object, **_kwargs: object):
+        yield _make_stream_chunk("Bonjour le ")
+        raise RuntimeError(_HOSTILE_MESSAGE)
+
+    at = AppTest.from_file("streamlit_app.py")
+    with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())):
+        _run(at)
+    _translate_with(at, "hello world", side_effect=stream_then_die)
+
+    value = _the_error_starting(at, "Translation failed after partial output: ")
+    assert escape_markdown(_HOSTILE_MESSAGE) in value
+    assert _HOSTILE_MESSAGE not in value

@@ -15,6 +15,7 @@ from streamlit_app import (
     build_translation_prompt,
     clean_model_output,
     clip_to_input_cap,
+    escape_markdown,
     render_output,
     settled_download_name,
     stream_translate,
@@ -671,13 +672,15 @@ def test_translate_block_is_the_last_top_level_statement() -> None:
     # `with doc_tab:` ran after this block, and why a deferred _rerun_pending
     # flag existed until 2026-09-13. The UI test that caught it went with the
     # tab, so the precondition is pinned here instead: the
-    # `if st.session_state._do_translate:` block must be the module's last
-    # statement. Parsed rather than grepped, so a trailing comment or a
+    # `if translate_clicked:` block must be the module's last statement
+    # (`translate_clicked` is st.button's return value; it was a
+    # `st.session_state._do_translate` flag set by a callback until
+    # 2026-09-14). Parsed rather than grepped, so a trailing comment or a
     # re-wrapped condition cannot fail it and a widget appended below it
     # cannot pass.
     last = ast.parse(_APP_SOURCE).body[-1]
     assert isinstance(last, ast.If), ast.dump(last)[:120]
-    assert ast.unparse(last.test) == "st.session_state._do_translate"
+    assert ast.unparse(last.test) == "translate_clicked"
 
 
 # -- render_output -------------------------------------------------------------
@@ -759,3 +762,46 @@ def test_clip_to_input_cap_leaves_text_under_the_cap_alone() -> None:
     assert clip_to_input_cap("short", 30_000) == "short"
     assert clip_to_input_cap("x" * 30_000, 30_000) == "x" * 30_000
     assert clip_to_input_cap("x" * 30_001, 30_000) == "x" * 30_000
+
+
+# -- escape_markdown -----------------------------------------------------------
+
+
+def test_escape_markdown_leaves_plain_text_alone() -> None:
+    assert escape_markdown("download failed") == "download failed"
+
+
+def test_escape_markdown_neutralises_streamlit_markup() -> None:
+    # Asserted by OUTCOME, not by re-listing the regex's own character class.
+    # Alert bodies render more than CommonMark: LaTeX, emoji shortcodes and
+    # HTML entities all need neutralising too.
+    for raw, must_not_contain in [
+        ("Model.__init__() missing 1 argument", "__init__"),
+        ("~half~ done", "~half~"),
+        ("[r](https://example.com)", "]("),
+        ("budget $100 vs $200", "$100 vs $200"),
+        ("photo:sunglasses:", ":sunglasses:"),
+        ("AT&amp;T", "&amp;"),
+    ]:
+        assert must_not_contain not in escape_markdown(raw), raw
+    # A leading "#" would render as a heading; it must carry its backslash.
+    assert escape_markdown("# heading").startswith("\\#")
+
+
+def test_escape_markdown_covers_all_ascii_punctuation() -> None:
+    # CommonMark permits a backslash before any ASCII punctuation, and renders
+    # it as the bare character -- so over-escaping is free and under-escaping
+    # is the only failure mode.
+    import string
+
+    for ch in string.punctuation:
+        assert escape_markdown(ch) == "\\" + ch
+
+
+def test_every_exception_reaches_an_alert_escaped() -> None:
+    # The three failure paths each build their own f-string; the UI tests pin
+    # each through its sink. This is the guard for a fourth: an alert body is
+    # Markdown, so a raw `{e}` anywhere in the module is a rendering bug
+    # waiting for a dunder in the message.
+    assert not re.search(r"\{e\}", _APP_SOURCE)
+    assert _APP_SOURCE.count("{escape_markdown(str(e))}") == 3

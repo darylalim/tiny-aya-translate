@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
+import re
 from collections.abc import Iterator
 from typing import Any
 
@@ -24,6 +25,8 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 # checked before get_token(), the only reader of HF_TOKEN).
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
+import streamlit as st
 
 # -- Config ------------------------------------------------------------------
 
@@ -244,7 +247,32 @@ def clip_to_input_cap(text: str, limit: int = MAX_INPUT_CHARS) -> str:
     return text
 
 
-import streamlit as st  # noqa: E402
+# Every ASCII punctuation character -- exactly the set CommonMark permits to be
+# backslash-escaped, and deliberately wider than "the metacharacters one thinks
+# of". Streamlit's alert bodies render more than CommonMark: LaTeX ($...$),
+# emoji shortcodes (:tada:) and HTML entities (&amp;) are live too, so a
+# CommonMark-only class would still let an exception's text render as markup.
+# A backslash before ASCII punctuation is never displayed, so over-escaping
+# costs nothing.
+_MD_PUNCTUATION = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+_MD_SPECIAL_RE = re.compile(f"([{re.escape(_MD_PUNCTUATION)}])")
+
+
+def escape_markdown(text: str) -> str:
+    """Backslash-escape GFM metacharacters so ``text`` renders literally.
+
+    ``st.error`` and ``st.warning`` parse their body as GitHub-flavored
+    Markdown, and exception text is not written for it: the common Python
+    shape ``Model.__init__() missing 1 required positional argument`` renders
+    with the dunder swallowed as bold, and two ``~`` in one message strike
+    through the span between them (the bundle's remark-gfm keeps
+    ``singleTilde`` on). Applied at every site that interpolates an
+    exception into an alert.
+    """
+    return _MD_SPECIAL_RE.sub(r"\\\1", text)
+
+
+# -- Page config -------------------------------------------------------------
 
 st.set_page_config(
     page_title="Tiny Aya Translate",
@@ -322,9 +350,9 @@ def ensure_model(slot: Any) -> tuple[Any, Any] | None:
     except Exception as e:
         # Keep the "Failed to load model: " prefix -- a UI test matches on it.
         slot.error(
-            f"Failed to load model: {e}\n\nThe first run downloads ~3.6 GB from "
-            "Hugging Face. Check your connection and disk space, then click "
-            "Translate again."
+            f"Failed to load model: {escape_markdown(str(e))}\n\nThe first run "
+            "downloads ~3.6 GB from Hugging Face. Check your connection and "
+            "disk space, then click Translate again."
         )
         return None
 
@@ -344,16 +372,10 @@ st.session_state.setdefault("download_name", DEFAULT_DOWNLOAD_NAME)
 # block, which runs *below* the panels and then reruns. Without this the
 # rerun that repaints the output would also discard the explanation of it.
 st.session_state.setdefault("translate_notice", "")
-st.session_state.setdefault("_do_translate", False)
-
-
-def request_translate() -> None:
-    """Flag that a translation was requested (processed after controls row)."""
-    st.session_state._do_translate = True
 
 
 def clear_translate_output() -> None:
-    """Drop a settled translation when either language picker moves.
+    """Drop a settled translation: a picker moved, or Translate was clicked.
 
     The settled output is an unlabelled ``st.code`` block -- no label, no
     caption, no placeholder -- so nothing on screen names the pair that
@@ -365,6 +387,17 @@ def clear_translate_output() -> None:
     Translate is one click. ``swap_languages`` needs no hook of its own -- it
     already clears the output, and Streamlit does not fire ``on_change`` for a
     programmatic session-state write.
+
+    Also the Translate button's ``on_click``, which is what makes the run
+    that streams paint Download disabled with no bytes: a callback runs
+    before the script, and the docked bar renders from these two keys before
+    the translate block touches them. Without it the previous translation
+    stayed downloadable under the previous target's name for the whole
+    stream, while the skeleton had already cleared it from the panel -- and
+    ``on_click="ignore"`` on Download makes that click a plain fetch of bytes
+    fixed at render time. The cost is that the three pre-stream warnings drop
+    the previous translation too; it was a translation of input the user has
+    since replaced, so state agrees with the message, as on the reset paths.
 
     The one writer for an empty output, as ``settle_translate_output`` is for
     a settled one. The translate block's two reset paths used to inline this
@@ -598,11 +631,21 @@ with st.bottom:
         2, vertical_alignment="center", gap="small", wrap=False
     )
     with sub_translate:
-        st.button(
+        # The return value is the click signal: True on the run the click
+        # starts, False after the block's closing st.rerun() -- a
+        # RerunException counts as a completed run, so the trigger resets
+        # (exec_code.py: "we want to count as a script completion so triggers
+        # reset"). A callback-and-flag (`_do_translate`) carried it from
+        # 2026-03-30, when the block ran *above* a widget-keyed output panel
+        # and only a callback could set state before that widget rendered;
+        # the block moved below the bar the same day, and the flag outlived
+        # its reason until 2026-09-14. The callback that remains has a job of
+        # its own -- see clear_translate_output.
+        translate_clicked = st.button(
             "Translate",
             key="translate",
             icon=":material/translate:",
-            on_click=request_translate,
+            on_click=clear_translate_output,
             type="primary",
             width="stretch",
         )
@@ -624,8 +667,7 @@ with st.bottom:
 
 # -- Process translation request (below controls) -----------------------------
 
-if st.session_state._do_translate:
-    st.session_state._do_translate = False
+if translate_clicked:
     current_input = st.session_state.translate_input
     if not current_input.strip():
         warning_slot.warning("Please enter some text first.")
@@ -703,7 +745,8 @@ if st.session_state._do_translate:
                 settle_translate_output(partial)
                 st.session_state.translate_notice = (
                     "error",
-                    f"Translation failed after partial output: {e}",
+                    "Translation failed after partial output: "
+                    f"{escape_markdown(str(e))}",
                 )
             else:
                 # No partial, so this run produced nothing -- and state
@@ -714,6 +757,6 @@ if st.session_state._do_translate:
                 clear_translate_output()
                 st.session_state.translate_notice = (
                     "error",
-                    f"Translation failed: {e}",
+                    f"Translation failed: {escape_markdown(str(e))}",
                 )
             st.rerun()

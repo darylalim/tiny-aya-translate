@@ -1,7 +1,8 @@
 # "Reading Room" -- Tiny Aya Translate's own theme, dual light/dark mode,
 # dark-first. A warm-neutral ink-and-paper palette for a page whose whole
-# surface is two 450px panels of prose in any of 67 scripts, with one
-# verdigris accent used as rubrication rather than as a brand. Both modes
+# surface is two panels of prose in any of 67 scripts (their height is
+# PANEL_HEIGHT in streamlit_app.py, a measured budget not restated here), with
+# one verdigris accent used as rubrication rather than as a brand. Both modes
 # are stated in full. Note what that does NOT earn: a repo with no config at
 # all still gets the full System/Light/Dark switch, so defining both
 # sections is not what surfaces it. What is true is narrower -- once a
